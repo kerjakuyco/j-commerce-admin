@@ -1,6 +1,10 @@
 # j-commerce-admin
 
-Admin web untuk `j-commerce-api`, dibangun dengan Vite, React 19, TypeScript, TanStack Query, React Router, Recharts, Motion, React Hook Form, dan Zod.
+Admin web untuk `j-commerce-api`, dibangun dengan Vite, React 19, TypeScript 6, TanStack Query, React Router, Recharts, Motion, React Hook Form, dan Zod.
+
+## Tech Stack
+
+Lihat [`STACK.md`](./STACK.md) untuk dependency lengkap dan versi.
 
 ## Scope
 

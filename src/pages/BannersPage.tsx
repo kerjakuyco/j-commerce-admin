@@ -4,6 +4,7 @@ import { Megaphone, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
+import { Badge } from "../components/Badge";
 import { ErrorState } from "../components/ErrorState";
 import { LoadingState } from "../components/LoadingState";
 import { Panel } from "../components/Panel";
@@ -19,6 +20,16 @@ const bannerSchema = z.object({
   sortOrder: z.coerce.number().int().min(0),
 });
 
+function isSafeImageUrl(url: string) {
+  if (url.startsWith("/")) return true;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 type BannerFormInput = z.input<typeof bannerSchema>;
 type BannerForm = z.output<typeof bannerSchema>;
 
@@ -27,7 +38,7 @@ export function BannersPage() {
   const queryClient = useQueryClient();
   const bannersQuery = useQuery({
     queryKey: ["banners"],
-    queryFn: () => request<Banner[]>("/banners", { token }),
+    queryFn: () => request<Banner[]>("/banners/admin/all", { token }),
   });
   const form = useForm<BannerFormInput, unknown, BannerForm>({
     resolver: zodResolver(bannerSchema),
@@ -52,7 +63,20 @@ export function BannersPage() {
       request(`/banners/${id}`, { token, method: "DELETE" }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["banners"] });
-      toast.success("Banner removed");
+      toast.success("Banner deactivated");
+    },
+    onError: (error) => toast.error(readError(error)),
+  });
+  const toggleBanner = useMutation({
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
+      request<Banner>(`/banners/${id}`, {
+        token,
+        method: "PATCH",
+        body: JSON.stringify({ isActive }),
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["banners"] });
+      toast.success("Banner status updated");
     },
     onError: (error) => toast.error(readError(error)),
   });
@@ -67,23 +91,31 @@ export function BannersPage() {
         <div className="banner-wall">
           {(bannersQuery.data ?? []).map((banner) => (
             <article className="banner-card" key={banner.id}>
-              <img src={banner.image} alt="" />
+              {isSafeImageUrl(banner.image) && <img src={banner.image} alt="" />}
               <div>
                 <strong>{banner.title}</strong>
                 <span>
                   {banner.link || "No link"} · order {banner.sortOrder}
                 </span>
+                <Badge tone={banner.isActive ? "good" : "neutral"}>
+                  {banner.isActive ? "Active" : "Inactive"}
+                </Badge>
               </div>
               <button
                 className="ghost-button"
                 type="button"
+                disabled={deleteBanner.isPending || toggleBanner.isPending}
                 onClick={() => {
-                  if (window.confirm(`Remove banner ${banner.title}?`)) {
-                    deleteBanner.mutate(banner.id);
+                  if (banner.isActive) {
+                    if (window.confirm(`Deactivate banner ${banner.title}?`)) {
+                      deleteBanner.mutate(banner.id);
+                    }
+                  } else {
+                    toggleBanner.mutate({ id: banner.id, isActive: true });
                   }
                 }}
               >
-                <Trash2 size={16} /> Remove
+                <Trash2 size={16} /> {banner.isActive ? "Deactivate" : "Activate"}
               </button>
             </article>
           ))}

@@ -37,7 +37,7 @@ function App() {
 
 function ProtectedShell() {
   const { session } = useAuth()
-  if (!session) return <Navigate to="/login" replace />
+  if (!session || session.user.role !== 'ADMIN') return <Navigate to="/login" replace />
   return <Shell />
 }
 

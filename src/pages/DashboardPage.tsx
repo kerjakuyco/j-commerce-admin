@@ -51,8 +51,13 @@ export function DashboardPage() {
 
   if (statsQuery.isLoading)
     return <LoadingState label="Loading dashboard data..." />;
-  if (statsQuery.error)
-    return <ErrorState message={readError(statsQuery.error)} />;
+
+  const error =
+    statsQuery.error ??
+    revenueQuery.error ??
+    topQuery.error ??
+    statusQuery.error;
+  if (error) return <ErrorState message={readError(error)} />;
 
   const stats = statsQuery.data;
   const revenue = revenueQuery.data ?? [];

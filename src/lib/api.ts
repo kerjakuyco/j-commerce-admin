@@ -33,10 +33,18 @@ export async function request<T>(path: string, options: ApiOptions = {}): Promis
 
   const response = await fetch(apiUrl(path), { ...init, headers })
   const text = await response.text()
-  const body = text && !skipJson ? parseJson(text) : text
-
   if (!response.ok) {
+    const body = text ? parseJson(text) : text
     throw new ApiError(readApiMessage(body, response.statusText), response.status)
+  }
+
+  if (skipJson || text.length === 0) {
+    return undefined as T
+  }
+
+  const body = parseJson(text)
+  if (!body || typeof body !== 'object') {
+    throw new ApiError('Unexpected response format', response.status)
   }
 
   return body as T
@@ -46,6 +54,13 @@ export function login(email: string, password: string) {
   return request<AuthResponse>('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+  })
+}
+
+export function refreshTokens(refreshToken: string) {
+  return request<Pick<AuthResponse, 'accessToken' | 'refreshToken' | 'expiresIn'>>('/auth/refresh', {
+    method: 'POST',
+    body: JSON.stringify({ refreshToken }),
   })
 }
 

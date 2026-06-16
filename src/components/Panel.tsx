@@ -1,3 +1,5 @@
+import clsx from 'clsx'
+
 export function Panel({
   title,
   eyebrow,
@@ -10,7 +12,7 @@ export function Panel({
   className?: string;
 }) {
   return (
-    <section className={`panel ${className}`}>
+    <section className={clsx('panel', className)}>
       <div className="panel-header">
         <div>
           {eyebrow && <span className="eyebrow">{eyebrow}</span>}

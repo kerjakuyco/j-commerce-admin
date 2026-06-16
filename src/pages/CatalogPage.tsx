@@ -171,7 +171,7 @@ export function CatalogPage() {
 
   const deleteProduct = useMutation({
     mutationFn: (id: string) =>
-      request<Product>(`/products/${id}`, { token, method: "DELETE" }),
+      request<{ message: string }>(`/products/${id}`, { token, method: "DELETE" }),
     onSuccess: async () => {
       await invalidateCatalog();
       toast.success("Product deleted");
@@ -234,7 +234,11 @@ export function CatalogPage() {
               className="table-button"
               type="button"
               onClick={() => {
-                if (window.confirm(`Delete product ${product.name}?`)) {
+                if (
+                  window.confirm(
+                    `Deactivate product "${product.name}"? It will be hidden from the storefront but existing orders remain unaffected.`,
+                  )
+                ) {
                   deleteProduct.mutate(product.id);
                 }
               }}

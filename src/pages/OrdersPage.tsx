@@ -6,10 +6,12 @@ import { ErrorState } from "../components/ErrorState";
 import { LoadingState } from "../components/LoadingState";
 import { Panel } from "../components/Panel";
 import { useToken } from "../context/AuthContext";
-import { orderStatuses } from "../lib/constants";
+import { allowedStatusTransitions, orderStatuses } from "../lib/constants";
 import { request } from "../lib/api";
 import { money, readError, shortDate } from "../lib/format";
 import type { Order, OrderStatus, Paginated } from "../types";
+
+const CANCELLABLE_STATUSES: OrderStatus[] = ["PENDING", "PAID"];
 
 export function OrdersPage() {
   const token = useToken();
@@ -52,14 +54,17 @@ export function OrdersPage() {
     <Panel title="Order management" eyebrow="fulfillment">
       <DataTable
         columns={[
-          "Invoice",
-          "Customer",
-          "Date",
-          "Status",
-          "Payment",
-          "Total",
-          "Move",
+          { label: "Invoice", key: "invoice" },
+          { label: "Customer", key: "customer" },
+          { label: "Date", key: "date" },
+          { label: "Status", key: "status" },
+          { label: "Payment", key: "payment" },
+          { label: "Total", key: "total" },
+          { label: "Move", key: "move" },
         ]}
+        keyExtractor={(_row, index) =>
+          ordersQuery.data?.data[index]?.id ?? index
+        }
         rows={(ordersQuery.data?.data ?? []).map((order) => [
           order.orderNumber,
           order.user?.name ?? order.user?.email ?? "-",
@@ -77,6 +82,7 @@ export function OrdersPage() {
           <div key={`${order.id}-actions`} className="table-actions">
             <select
               value={order.status}
+              disabled={statusMutation.isPending}
               onChange={(event) =>
                 statusMutation.mutate({
                   id: order.id,
@@ -85,10 +91,18 @@ export function OrdersPage() {
               }
             >
               {orderStatuses.map((status) => (
-                <option key={status}>{status}</option>
+                <option
+                  key={status}
+                  disabled={
+                    status !== order.status &&
+                    !allowedStatusTransitions[order.status].includes(status)
+                  }
+                >
+                  {status}
+                </option>
               ))}
             </select>
-            {(order.status === "PENDING" || order.status === "PAID") && (
+            {CANCELLABLE_STATUSES.includes(order.status) && (
               <button
                 className="table-button"
                 type="button"

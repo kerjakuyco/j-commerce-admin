@@ -8,5 +8,14 @@ export const orderStatuses: OrderStatus[] = [
   'DELIVERED',
 ]
 
+export const allowedStatusTransitions: Record<OrderStatus, OrderStatus[]> = {
+  PENDING: ['PAID'],
+  PAID: ['PACKED'],
+  PACKED: ['SHIPPED'],
+  SHIPPED: ['DELIVERED'],
+  DELIVERED: [],
+  CANCELLED: [],
+}
+
 export const voucherTypes: VoucherType[] = ['FIXED', 'PERCENTAGE']
 export const notificationTypes: NotificationType[] = ['PROMO', 'ORDER', 'SYSTEM']
