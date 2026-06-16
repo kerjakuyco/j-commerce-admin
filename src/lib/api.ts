@@ -1,6 +1,11 @@
 import type { AuthResponse } from '../types'
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:3000/api/v1'
+const configuredBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim()
+
+export const API_BASE_URL = (configuredBaseUrl || 'http://localhost:3000/api/v1').replace(
+  /\/+$/,
+  '',
+)
 
 type ApiOptions = RequestInit & {
   token?: string
@@ -26,7 +31,7 @@ export async function request<T>(path: string, options: ApiOptions = {}): Promis
     headers.set('Content-Type', 'application/json')
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, { ...init, headers })
+  const response = await fetch(apiUrl(path), { ...init, headers })
   const text = await response.text()
   const body = text && !skipJson ? parseJson(text) : text
 
@@ -40,8 +45,13 @@ export async function request<T>(path: string, options: ApiOptions = {}): Promis
 export function login(email: string, password: string) {
   return request<AuthResponse>('/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
   })
+}
+
+function apiUrl(path: string) {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  return `${API_BASE_URL}${normalizedPath}`
 }
 
 function parseJson(text: string): unknown {

@@ -22,7 +22,7 @@ export interface User {
   phone?: string | null
   avatar?: string | null
   role: UserRole
-  isActive: boolean
+  isActive?: boolean
   createdAt: string
 }
 

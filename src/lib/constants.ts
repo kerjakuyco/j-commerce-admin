@@ -6,7 +6,6 @@ export const orderStatuses: OrderStatus[] = [
   'PACKED',
   'SHIPPED',
   'DELIVERED',
-  'CANCELLED',
 ]
 
 export const voucherTypes: VoucherType[] = ['FIXED', 'PERCENTAGE']

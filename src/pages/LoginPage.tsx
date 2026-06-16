@@ -1,54 +1,53 @@
-import { zodResolver } from '@hookform/resolvers/zod'
-import { motion } from 'framer-motion'
-import { useForm } from 'react-hook-form'
-import { Navigate } from 'react-router-dom'
-import { toast } from 'sonner'
-import { z } from 'zod'
-import { useAuth } from '../context/AuthContext'
-import { API_BASE_URL, login } from '../lib/api'
-import { readError } from '../lib/format'
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { Navigate } from "react-router-dom";
+import { toast } from "sonner";
+import { z } from "zod";
+import { useAuth } from "../context/AuthContext";
+import { API_BASE_URL, login } from "../lib/api";
+import { readError } from "../lib/format";
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  email: z.preprocess(
+    (value) => (typeof value === "string" ? value.trim().toLowerCase() : value),
+    z.string().email(),
+  ),
   password: z.string().min(1),
-})
+});
 
-type LoginForm = z.infer<typeof loginSchema>
+type LoginFormInput = z.input<typeof loginSchema>;
+type LoginForm = z.output<typeof loginSchema>;
 
 export function LoginPage() {
-  const { session, setSession } = useAuth()
-  const form = useForm<LoginForm>({
+  const { session, setSession } = useAuth();
+  const form = useForm<LoginFormInput, unknown, LoginForm>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: 'admin@jcommerce.com', password: 'admin123' },
-  })
+    defaultValues: { email: "", password: "" },
+  });
 
-  if (session) return <Navigate to="/" replace />
+  if (session) return <Navigate to="/" replace />;
 
   async function submit(values: LoginForm) {
     try {
-      const nextSession = await login(values.email, values.password)
-      if (nextSession.user.role !== 'ADMIN') throw new Error('Akun ini bukan admin')
-      setSession(nextSession)
-      toast.success(`Welcome back, ${nextSession.user.name}`)
+      const nextSession = await login(values.email, values.password);
+      if (nextSession.user.role !== "ADMIN")
+        throw new Error("Akun ini bukan admin");
+      setSession(nextSession);
+      toast.success(`Welcome back, ${nextSession.user.name}`);
     } catch (error) {
-      toast.error(readError(error))
+      toast.error(readError(error));
     }
   }
 
   return (
     <main className="login-scene">
-      <motion.section
-        className="login-layout"
-        initial={{ opacity: 0, scale: 0.98 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5 }}
-      >
+      <section className="login-layout">
         <div className="login-poster">
-          <span className="eyebrow">single-store command room</span>
-          <h1>Run the bazaar like a trading floor.</h1>
+          <span className="eyebrow">single-store admin</span>
+          <h1>Manage orders, catalog, and campaigns in one focused console.</h1>
           <p>
-            Catalog, fulfillment, promo, broadcast, banners, uploads, and revenue telemetry in
-            one unapologetically sharp admin surface.
+            A calm operations workspace for fulfillment, promos, banners,
+            uploads, and revenue telemetry, tuned for fast decisions.
           </p>
           <div className="poster-lines" aria-hidden="true" />
         </div>
@@ -59,17 +58,21 @@ export function LoginPage() {
           </div>
           <label>
             Email
-            <input {...form.register('email')} />
+            <input {...form.register("email")} />
           </label>
           <label>
             Password
-            <input type="password" {...form.register('password')} />
+            <input type="password" {...form.register("password")} />
           </label>
-          <button className="primary-button" type="submit" disabled={form.formState.isSubmitting}>
-            {form.formState.isSubmitting ? 'Entering...' : 'Enter admin'}
+          <button
+            className="primary-button"
+            type="submit"
+            disabled={form.formState.isSubmitting}
+          >
+            {form.formState.isSubmitting ? "Signing in..." : "Sign in"}
           </button>
         </form>
-      </motion.section>
+      </section>
     </main>
-  )
+  );
 }

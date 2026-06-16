@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useContext, useEffect, useState } from 'react'
 import type { AuthResponse } from '../types'
 
 interface AuthContextValue {
@@ -10,12 +10,31 @@ interface AuthContextValue {
 const storageKey = 'j-commerce-admin-session'
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+type StoredSession = AuthResponse & { expiresAt: number }
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSessionState] = useState<AuthResponse | null>(() => readSession())
 
+  useEffect(() => {
+    if (!session) return undefined
+    const expiresAt = (session as StoredSession).expiresAt
+    if (!expiresAt) return undefined
+    const delay = expiresAt - Date.now()
+    if (delay <= 0) {
+      logout()
+      return undefined
+    }
+    const timeout = window.setTimeout(logout, delay)
+    return () => window.clearTimeout(timeout)
+  }, [session])
+
   function setSession(nextSession: AuthResponse) {
-    localStorage.setItem(storageKey, JSON.stringify(nextSession))
-    setSessionState(nextSession)
+    const storedSession: StoredSession = {
+      ...nextSession,
+      expiresAt: Date.now() + nextSession.expiresIn * 1000,
+    }
+    localStorage.setItem(storageKey, JSON.stringify(storedSession))
+    setSessionState(storedSession)
   }
 
   function logout() {
@@ -46,9 +65,31 @@ function readSession() {
   const raw = localStorage.getItem(storageKey)
   if (!raw) return null
   try {
-    return JSON.parse(raw) as AuthResponse
+    const parsed = JSON.parse(raw) as unknown
+    if (!isStoredSession(parsed) || parsed.expiresAt <= Date.now()) {
+      localStorage.removeItem(storageKey)
+      return null
+    }
+    return parsed
   } catch {
     localStorage.removeItem(storageKey)
     return null
   }
+}
+
+function isStoredSession(value: unknown): value is StoredSession {
+  if (!value || typeof value !== 'object') return false
+  const record = value as Record<string, unknown>
+  const user = record.user as Record<string, unknown> | undefined
+  return (
+    typeof record.accessToken === 'string' &&
+    typeof record.refreshToken === 'string' &&
+    typeof record.expiresIn === 'number' &&
+    typeof record.expiresAt === 'number' &&
+    !!user &&
+    typeof user.id === 'string' &&
+    typeof user.email === 'string' &&
+    typeof user.name === 'string' &&
+    user.role === 'ADMIN'
+  )
 }

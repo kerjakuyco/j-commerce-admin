@@ -1,23 +1,16 @@
-import { motion } from 'framer-motion'
-
 export function Panel({
   title,
   eyebrow,
   children,
-  className = '',
+  className = "",
 }: {
-  title: string
-  eyebrow?: string
-  children: React.ReactNode
-  className?: string
+  title: string;
+  eyebrow?: string;
+  children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <motion.section
-      className={`panel ${className}`}
-      initial={{ opacity: 0, y: 18 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-    >
+    <section className={`panel ${className}`}>
       <div className="panel-header">
         <div>
           {eyebrow && <span className="eyebrow">{eyebrow}</span>}
@@ -25,16 +18,24 @@ export function Panel({
         </div>
       </div>
       {children}
-    </motion.section>
-  )
+    </section>
+  );
 }
 
-export function StatCard({ label, value, detail }: { label: string; value: React.ReactNode; detail?: string }) {
+export function StatCard({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: React.ReactNode;
+  detail?: string;
+}) {
   return (
-    <motion.article className="stat-card" whileHover={{ y: -4 }} transition={{ duration: 0.2 }}>
+    <article className="stat-card">
       <span>{label}</span>
       <strong>{value}</strong>
       {detail && <small>{detail}</small>}
-    </motion.article>
-  )
+    </article>
+  );
 }
