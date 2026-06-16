@@ -1,0 +1,13 @@
+import type { NotificationType, OrderStatus, VoucherType } from '../types'
+
+export const orderStatuses: OrderStatus[] = [
+  'PENDING',
+  'PAID',
+  'PACKED',
+  'SHIPPED',
+  'DELIVERED',
+  'CANCELLED',
+]
+
+export const voucherTypes: VoucherType[] = ['FIXED', 'PERCENTAGE']
+export const notificationTypes: NotificationType[] = ['PROMO', 'ORDER', 'SYSTEM']
