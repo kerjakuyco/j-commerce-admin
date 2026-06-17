@@ -26,7 +26,9 @@ export function DataTable({
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={columns.length}>{empty}</td>
+              <td colSpan={columns.length} className="table-empty">
+                {empty}
+              </td>
             </tr>
           ) : (
             rows.map((row, index) => (

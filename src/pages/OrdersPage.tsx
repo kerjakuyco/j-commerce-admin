@@ -6,7 +6,7 @@ import { ErrorState } from "../components/ErrorState";
 import { LoadingState } from "../components/LoadingState";
 import { Panel } from "../components/Panel";
 import { useToken } from "../context/AuthContext";
-import { allowedStatusTransitions, orderStatuses } from "../lib/constants";
+import { allowedStatusTransitions, isOrderStatus, orderStatuses } from "../lib/constants";
 import { request } from "../lib/api";
 import { money, readError, shortDate } from "../lib/format";
 import type { Order, OrderStatus, Paginated } from "../types";
@@ -18,7 +18,8 @@ export function OrdersPage() {
   const queryClient = useQueryClient();
   const ordersQuery = useQuery({
     queryKey: ["orders"],
-    queryFn: () => request<Paginated<Order>>("/orders?limit=100", { token }),
+    queryFn: ({ signal }) =>
+      request<Paginated<Order>>("/orders?limit=100", { token, signal }),
   });
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: OrderStatus }) =>
@@ -83,12 +84,12 @@ export function OrdersPage() {
             <select
               value={order.status}
               disabled={statusMutation.isPending}
-              onChange={(event) =>
-                statusMutation.mutate({
-                  id: order.id,
-                  status: event.target.value as OrderStatus,
-                })
-              }
+              onChange={(event) => {
+                const value = event.target.value;
+                // Validate before casting; CANCELLED must route through Cancel.
+                if (!isOrderStatus(value)) return;
+                statusMutation.mutate({ id: order.id, status: value });
+              }}
             >
               {orderStatuses.map((status) => (
                 <option
@@ -101,6 +102,14 @@ export function OrdersPage() {
                   {status}
                 </option>
               ))}
+              {/* Display-only CANCELLED option so cancelled orders show their
+                real status; it is disabled so transitions can't reach it here
+                and must go through the Cancel action below. */}
+              {order.status === "CANCELLED" && (
+                <option value="CANCELLED" disabled>
+                  CANCELLED
+                </option>
+              )}
             </select>
             {CANCELLABLE_STATUSES.includes(order.status) && (
               <button

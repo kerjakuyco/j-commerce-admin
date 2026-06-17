@@ -8,6 +8,14 @@ export const orderStatuses: OrderStatus[] = [
   'DELIVERED',
 ]
 
+const allOrderStatuses: readonly OrderStatus[] = [...orderStatuses, 'CANCELLED']
+
+// Runtime guard so callers don't have to blindly cast string values (e.g. the
+// order status <select> onChange) to OrderStatus.
+export function isOrderStatus(value: string): value is OrderStatus {
+  return (allOrderStatuses as readonly string[]).includes(value)
+}
+
 export const allowedStatusTransitions: Record<OrderStatus, OrderStatus[]> = {
   PENDING: ['PAID'],
   PAID: ['PACKED'],

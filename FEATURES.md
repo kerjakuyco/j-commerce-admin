@@ -87,8 +87,12 @@ Status: implemented admin console for `j-commerce-api`.
 
 ## Current Known Issues
 
-- Order status dropdown currently exposes `CANCELLED`; this should route through the cancel flow to preserve stock/payment side effects.
-- Users page currently receives all users; admin self-disable/protected-admin safeguards should be added.
-- Upload UI copy says max 5 files; client-side validation should enforce the limit before calling the API.
-- Some forms rely on placeholders and Zod resolver only; visible labels and inline validation messages should be added.
-- Voucher list uses the public active-voucher endpoint; admin management needs expired/inactive/exhausted vouchers too.
+- Refresh-token is currently stored in `localStorage` (readable by client JS). The recommended hardening next step is to migrate the refresh-token to an HttpOnly, Secure, SameSite=Strict cookie issued by the API, so client JS cannot read it and the Content-Security-Policy can be further tightened (e.g. drop `connect-src` wildcards once the API is same-origin or cookie-authenticated).
+
+## Resolved
+
+- Order status dropdown no longer exposes `CANCELLED` as a selectable transition; cancelled orders render a display-only disabled `CANCELLED` option and transitions route through the Cancel action.
+- Users page keeps the disabled UI hint and an explicit click-handler guard; the backend enforces self-disable and protected-admin rejection.
+- Upload UI enforces the 5-file limit client-side before calling the API.
+- Forms use visible `<label htmlFor>`/id pairs with inline validation messages from Zod.
+- Voucher list queries the admin endpoint (`GET /vouchers/admin/all`) with a fallback to the public list when the admin endpoint is unavailable.

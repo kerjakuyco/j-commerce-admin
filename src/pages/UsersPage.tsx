@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Search } from "lucide-react";
-import { useDeferredValue, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "../components/Badge";
 import { DataTable } from "../components/DataTable";
@@ -17,13 +17,19 @@ export function UsersPage() {
   const { session } = useAuth();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const deferredSearch = useDeferredValue(search);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  // useDeferredValue is not a debounce; use a 250ms timer so typing doesn't
+  // fire a request on every keystroke.
+  useEffect(() => {
+    const handle = window.setTimeout(() => setDebouncedSearch(search), 250);
+    return () => window.clearTimeout(handle);
+  }, [search]);
   const usersQuery = useQuery({
-    queryKey: ["users", deferredSearch],
-    queryFn: () =>
+    queryKey: ["users", debouncedSearch],
+    queryFn: ({ signal }) =>
       request<Paginated<User>>(
-        `/users?limit=80&search=${encodeURIComponent(deferredSearch)}`,
-        { token },
+        `/users?limit=80&search=${encodeURIComponent(debouncedSearch)}`,
+        { token, signal },
       ),
   });
   const toggleMutation = useMutation({
@@ -75,7 +81,12 @@ export function UsersPage() {
               className="table-button"
               type="button"
               disabled={protectedUser || toggleMutation.isPending}
-              onClick={() => toggleMutation.mutate(user)}
+              onClick={() => {
+                // The backend enforces self-disable and protected-admin
+                // rejection; guard here so we never even attempt the call.
+                if (protectedUser) return;
+                toggleMutation.mutate(user);
+              }}
               title={protectedUser ? "Admin accounts are protected" : undefined}
             >
               {protectedUser ? "Protected" : user.isActive ? "Disable" : "Enable"}

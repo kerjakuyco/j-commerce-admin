@@ -10,7 +10,7 @@ import { LoadingState } from "../components/LoadingState";
 import { Panel } from "../components/Panel";
 import { useToken } from "../context/AuthContext";
 import { voucherTypes } from "../lib/constants";
-import { request } from "../lib/api";
+import { ApiError, request } from "../lib/api";
 import { money, readError, shortDate, toNumber } from "../lib/format";
 import type { Paginated, Voucher, VoucherType } from "../types";
 
@@ -34,8 +34,19 @@ export function VouchersPage() {
   const token = useToken();
   const queryClient = useQueryClient();
   const vouchersQuery = useQuery({
-    queryKey: ["vouchers"],
-    queryFn: () => request<Paginated<Voucher>>("/vouchers?limit=80", { token }),
+    queryKey: ["vouchers", "admin"],
+    queryFn: ({ signal }) => {
+      // Prefer the admin endpoint (includes expired/inactive/exhausted rows).
+      // Fall back to the public active list if the API has not shipped it yet.
+      const run = (path: string) =>
+        request<Paginated<Voucher>>(path, { token, signal });
+      return run("/vouchers/admin/all?limit=80").catch((error: unknown) => {
+        if (error instanceof ApiError && error.status === 404) {
+          return run("/vouchers?limit=80");
+        }
+        throw error;
+      });
+    },
   });
   const form = useForm<VoucherFormInput, unknown, VoucherForm>({
     resolver: zodResolver(voucherSchema),
@@ -44,10 +55,12 @@ export function VouchersPage() {
       type: "FIXED",
       value: 0,
       minPurchase: 0,
+      maxDiscount: "",
       quota: 100,
       expiresAt: "",
     },
   });
+  const expiresAt = form.watch("expiresAt");
   const createVoucher = useMutation({
     mutationFn: (values: VoucherForm) =>
       request<Voucher>("/vouchers", {
@@ -56,7 +69,6 @@ export function VouchersPage() {
         body: JSON.stringify({
           ...values,
           code: values.code.toUpperCase(),
-          expiresAt: new Date(values.expiresAt).toISOString(),
         }),
       }),
     onSuccess: async () => {
@@ -65,6 +77,7 @@ export function VouchersPage() {
         type: "FIXED",
         value: 0,
         minPurchase: 0,
+        maxDiscount: "",
         quota: 100,
         expiresAt: "",
       });
@@ -100,33 +113,102 @@ export function VouchersPage() {
           className="control-form"
           onSubmit={form.handleSubmit((values) => createVoucher.mutate(values))}
         >
-          <input {...form.register("code")} placeholder="Code" />
-          <select {...form.register("type")}>
-            {voucherTypes.map((type: VoucherType) => (
-              <option key={type}>{type}</option>
-            ))}
-          </select>
-          <input
-            {...form.register("value")}
-            type="number"
-            placeholder="Value"
-          />
-          <input
-            {...form.register("minPurchase")}
-            type="number"
-            placeholder="Minimum purchase"
-          />
-          <input
-            {...form.register("maxDiscount")}
-            type="number"
-            placeholder="Max discount"
-          />
-          <input
-            {...form.register("quota")}
-            type="number"
-            placeholder="Quota"
-          />
-          <input {...form.register("expiresAt")} type="datetime-local" />
+          <label htmlFor="voucher-code">
+            Code
+            <input id="voucher-code" {...form.register("code")} placeholder="Code" />
+            {form.formState.errors.code && (
+              <span className="field-error">
+                {form.formState.errors.code.message}
+              </span>
+            )}
+          </label>
+          <label htmlFor="voucher-type">
+            Type
+            <select id="voucher-type" {...form.register("type")}>
+              {voucherTypes.map((type: VoucherType) => (
+                <option key={type}>{type}</option>
+              ))}
+            </select>
+            {form.formState.errors.type && (
+              <span className="field-error">
+                {form.formState.errors.type.message}
+              </span>
+            )}
+          </label>
+          <label htmlFor="voucher-value">
+            Value
+            <input
+              id="voucher-value"
+              {...form.register("value")}
+              type="number"
+              placeholder="Value"
+            />
+            {form.formState.errors.value && (
+              <span className="field-error">
+                {form.formState.errors.value.message}
+              </span>
+            )}
+          </label>
+          <label htmlFor="voucher-minPurchase">
+            Minimum purchase
+            <input
+              id="voucher-minPurchase"
+              {...form.register("minPurchase")}
+              type="number"
+              placeholder="Minimum purchase"
+            />
+            {form.formState.errors.minPurchase && (
+              <span className="field-error">
+                {form.formState.errors.minPurchase.message}
+              </span>
+            )}
+          </label>
+          <label htmlFor="voucher-maxDiscount">
+            Max discount
+            <input
+              id="voucher-maxDiscount"
+              {...form.register("maxDiscount")}
+              type="number"
+              placeholder="Max discount"
+            />
+            {form.formState.errors.maxDiscount && (
+              <span className="field-error">
+                {form.formState.errors.maxDiscount.message}
+              </span>
+            )}
+          </label>
+          <label htmlFor="voucher-quota">
+            Quota
+            <input
+              id="voucher-quota"
+              {...form.register("quota")}
+              type="number"
+              placeholder="Quota"
+            />
+            {form.formState.errors.quota && (
+              <span className="field-error">
+                {form.formState.errors.quota.message}
+              </span>
+            )}
+          </label>
+          <label htmlFor="voucher-expiresAt">
+            Expiry
+            <input
+              id="voucher-expiresAt"
+              {...form.register("expiresAt")}
+              type="datetime-local"
+            />
+            {/* datetime-local is timezone-naive; the backend stores the picked
+              value as UTC. Show the admin the exact UTC instant they're saving. */}
+            {expiresAt && (
+              <span className="field-hint">Stored as UTC: {expiresAt}:00Z</span>
+            )}
+            {form.formState.errors.expiresAt && (
+              <span className="field-error">
+                {form.formState.errors.expiresAt.message}
+              </span>
+            )}
+          </label>
           <button className="primary-button" disabled={createVoucher.isPending}>
             <TicketPlus size={17} /> Create voucher
           </button>

@@ -21,10 +21,12 @@ const bannerSchema = z.object({
 });
 
 function isSafeImageUrl(url: string) {
+  // Relative paths are same-origin and safe; remote images must be HTTPS so a
+  // banner URL can't pull in mixed-content or insecure assets.
   if (url.startsWith("/")) return true;
   try {
     const parsed = new URL(url);
-    return parsed.protocol === "http:" || parsed.protocol === "https:";
+    return parsed.protocol === "https:";
   } catch {
     return false;
   }
@@ -38,7 +40,7 @@ export function BannersPage() {
   const queryClient = useQueryClient();
   const bannersQuery = useQuery({
     queryKey: ["banners"],
-    queryFn: () => request<Banner[]>("/banners/admin/all", { token }),
+    queryFn: ({ signal }) => request<Banner[]>("/banners/admin/all", { token, signal }),
   });
   const form = useForm<BannerFormInput, unknown, BannerForm>({
     resolver: zodResolver(bannerSchema),
@@ -126,14 +128,47 @@ export function BannersPage() {
           className="control-form"
           onSubmit={form.handleSubmit((values) => createBanner.mutate(values))}
         >
-          <input {...form.register("title")} placeholder="Title" />
-          <input {...form.register("image")} placeholder="Image URL" />
-          <input {...form.register("link")} placeholder="Link" />
-          <input
-            {...form.register("sortOrder")}
-            type="number"
-            placeholder="Sort order"
-          />
+          <label htmlFor="banner-title">
+            Title
+            <input id="banner-title" {...form.register("title")} placeholder="Title" />
+            {form.formState.errors.title && (
+              <span className="field-error">
+                {form.formState.errors.title.message}
+              </span>
+            )}
+          </label>
+          <label htmlFor="banner-image">
+            Image URL
+            <input id="banner-image" {...form.register("image")} placeholder="Image URL" />
+            {form.formState.errors.image && (
+              <span className="field-error">
+                {form.formState.errors.image.message}
+              </span>
+            )}
+          </label>
+          <label htmlFor="banner-link">
+            Link
+            <input id="banner-link" {...form.register("link")} placeholder="Link" />
+            {form.formState.errors.link && (
+              <span className="field-error">
+                {form.formState.errors.link.message}
+              </span>
+            )}
+          </label>
+          <label htmlFor="banner-sortOrder">
+            Sort order
+            <input
+              id="banner-sortOrder"
+              {...form.register("sortOrder")}
+              type="number"
+              placeholder="Sort order"
+            />
+            {form.formState.errors.sortOrder && (
+              <span className="field-error">
+                {form.formState.errors.sortOrder.message}
+              </span>
+            )}
+          </label>
           <button className="primary-button" disabled={createBanner.isPending}>
             <Megaphone size={17} /> Publish banner
           </button>

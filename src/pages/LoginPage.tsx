@@ -30,6 +30,7 @@ export function LoginPage() {
   async function submit(values: LoginForm) {
     try {
       const nextSession = await login(values.email, values.password);
+      if (!nextSession) throw new Error("Login failed");
       if (nextSession.user.role !== "ADMIN")
         throw new Error("Akun ini bukan admin");
       setSession(nextSession);
@@ -56,13 +57,23 @@ export function LoginPage() {
             <span className="eyebrow">api target</span>
             <code>{API_BASE_URL}</code>
           </div>
-          <label>
+          <label htmlFor="login-email">
             Email
-            <input {...form.register("email")} />
+            <input id="login-email" {...form.register("email")} />
+            {form.formState.errors.email && (
+              <span className="field-error">
+                {form.formState.errors.email.message}
+              </span>
+            )}
           </label>
-          <label>
+          <label htmlFor="login-password">
             Password
-            <input type="password" {...form.register("password")} />
+            <input id="login-password" type="password" {...form.register("password")} />
+            {form.formState.errors.password && (
+              <span className="field-error">
+                {form.formState.errors.password.message}
+              </span>
+            )}
           </label>
           <button
             className="primary-button"

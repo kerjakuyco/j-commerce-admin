@@ -17,11 +17,12 @@ const notificationSchema = z.object({
   body: z.string().min(8),
 });
 
-type NotificationForm = z.infer<typeof notificationSchema>;
+type NotificationFormInput = z.input<typeof notificationSchema>;
+type NotificationForm = z.output<typeof notificationSchema>;
 
 export function NotificationsPage() {
   const token = useToken();
-  const form = useForm<NotificationForm>({
+  const form = useForm<NotificationFormInput, unknown, NotificationForm>({
     resolver: zodResolver(notificationSchema),
     defaultValues: { type: "SYSTEM", title: "", body: "" },
   });
@@ -50,27 +51,44 @@ export function NotificationsPage() {
             }
           })}
         >
-          <label>
+          <label htmlFor="notification-type">
             Type
-            <select {...form.register("type")}>
+            <select id="notification-type" {...form.register("type")}>
               {notificationTypes.map((type: NotificationType) => (
                 <option key={type}>{type}</option>
               ))}
             </select>
+            {form.formState.errors.type && (
+              <span className="field-error">
+                {form.formState.errors.type.message}
+              </span>
+            )}
           </label>
-          <label>
+          <label htmlFor="notification-title">
             Title
             <input
+              id="notification-title"
               {...form.register("title")}
               placeholder="Flash Sale Dimulai"
             />
+            {form.formState.errors.title && (
+              <span className="field-error">
+                {form.formState.errors.title.message}
+              </span>
+            )}
           </label>
-          <label>
+          <label htmlFor="notification-body">
             Message
             <textarea
+              id="notification-body"
               {...form.register("body")}
               placeholder="Write the broadcast body..."
             />
+            {form.formState.errors.body && (
+              <span className="field-error">
+                {form.formState.errors.body.message}
+              </span>
+            )}
           </label>
           <button className="primary-button" disabled={mutation.isPending}>
             <Radio size={17} />{" "}

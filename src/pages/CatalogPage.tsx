@@ -70,11 +70,12 @@ export function CatalogPage() {
   const queryClient = useQueryClient();
   const productsQuery = useQuery({
     queryKey: ["products"],
-    queryFn: () => request<Paginated<Product>>("/products?limit=80", { token }),
+    queryFn: ({ signal }) =>
+      request<Paginated<Product>>("/products?limit=80", { token, signal }),
   });
   const categoriesQuery = useQuery({
     queryKey: ["categories"],
-    queryFn: () => request<Category[]>("/categories", { token }),
+    queryFn: ({ signal }) => request<Category[]>("/categories", { token, signal }),
   });
 
   const productForm = useForm<ProductFormInput, unknown, ProductForm>({
@@ -86,6 +87,7 @@ export function CatalogPage() {
       description: "",
       categoryId: "",
       basePrice: 0,
+      discountPrice: "",
       imageUrl: "",
     },
   });
@@ -170,11 +172,13 @@ export function CatalogPage() {
   });
 
   const deleteProduct = useMutation({
+    // Soft-delete: the storefront hides the product but existing orders keep
+    // their snapshots intact.
     mutationFn: (id: string) =>
       request<{ message: string }>(`/products/${id}`, { token, method: "DELETE" }),
     onSuccess: async () => {
       await invalidateCatalog();
-      toast.success("Product deleted");
+      toast.success("Product removed");
     },
     onError: (error) => toast.error(readError(error)),
   });
@@ -220,23 +224,21 @@ export function CatalogPage() {
             "Variants",
             "Action",
           ]}
+          keyExtractor={(_row, index) => products[index]?.id ?? index}
           rows={products.map((product) => [
             product.name,
             product.brand,
             product.category?.name ?? "-",
             money(product.discountPrice ?? product.basePrice),
-            <Badge key={`${product.id}-rating`} tone="hot">
-              {product.rating.toFixed(1)}
-            </Badge>,
+            <Badge tone="hot">{product.rating.toFixed(1)}</Badge>,
             product._count?.variants ?? product.variants?.length ?? 0,
             <button
-              key={product.id}
               className="table-button"
               type="button"
               onClick={() => {
                 if (
                   window.confirm(
-                    `Deactivate product "${product.name}"? It will be hidden from the storefront but existing orders remain unaffected.`,
+                    `Remove product "${product.name}"? It will be hidden from the storefront but existing orders remain unaffected.`,
                   )
                 ) {
                   deleteProduct.mutate(product.id);
@@ -255,38 +257,107 @@ export function CatalogPage() {
             createProduct.mutate(values),
           )}
         >
-          <input {...productForm.register("name")} placeholder="Product name" />
-          <input
-            {...productForm.register("slug")}
-            placeholder="Slug (auto if empty)"
-          />
-          <input {...productForm.register("brand")} placeholder="Brand" />
-          <select {...productForm.register("categoryId")}>
-            <option value="">Select category</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-          <input
-            {...productForm.register("basePrice")}
-            type="number"
-            placeholder="Base price"
-          />
-          <input
-            {...productForm.register("discountPrice")}
-            type="number"
-            placeholder="Discount price"
-          />
-          <input
-            {...productForm.register("imageUrl")}
-            placeholder="Image URL"
-          />
-          <textarea
-            {...productForm.register("description")}
-            placeholder="Description"
-          />
+          <label htmlFor="product-name">
+            Name
+            <input id="product-name" {...productForm.register("name")} placeholder="Product name" />
+            {productForm.formState.errors.name && (
+              <span className="field-error">
+                {productForm.formState.errors.name.message}
+              </span>
+            )}
+          </label>
+          <label htmlFor="product-slug">
+            Slug
+            <input
+              id="product-slug"
+              {...productForm.register("slug")}
+              placeholder="Slug (auto if empty)"
+            />
+            {productForm.formState.errors.slug && (
+              <span className="field-error">
+                {productForm.formState.errors.slug.message}
+              </span>
+            )}
+          </label>
+          <label htmlFor="product-brand">
+            Brand
+            <input id="product-brand" {...productForm.register("brand")} placeholder="Brand" />
+            {productForm.formState.errors.brand && (
+              <span className="field-error">
+                {productForm.formState.errors.brand.message}
+              </span>
+            )}
+          </label>
+          <label htmlFor="product-category">
+            Category
+            <select id="product-category" {...productForm.register("categoryId")}>
+              <option value="">Select category</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+            {productForm.formState.errors.categoryId && (
+              <span className="field-error">
+                {productForm.formState.errors.categoryId.message}
+              </span>
+            )}
+          </label>
+          <label htmlFor="product-basePrice">
+            Base price
+            <input
+              id="product-basePrice"
+              {...productForm.register("basePrice")}
+              type="number"
+              placeholder="Base price"
+            />
+            {productForm.formState.errors.basePrice && (
+              <span className="field-error">
+                {productForm.formState.errors.basePrice.message}
+              </span>
+            )}
+          </label>
+          <label htmlFor="product-discountPrice">
+            Discount price
+            <input
+              id="product-discountPrice"
+              {...productForm.register("discountPrice")}
+              type="number"
+              placeholder="Discount price"
+            />
+            {productForm.formState.errors.discountPrice && (
+              <span className="field-error">
+                {productForm.formState.errors.discountPrice.message}
+              </span>
+            )}
+          </label>
+          <label htmlFor="product-imageUrl">
+            Image URL
+            <input
+              id="product-imageUrl"
+              {...productForm.register("imageUrl")}
+              placeholder="Image URL"
+            />
+            {productForm.formState.errors.imageUrl && (
+              <span className="field-error">
+                {productForm.formState.errors.imageUrl.message}
+              </span>
+            )}
+          </label>
+          <label htmlFor="product-description">
+            Description
+            <textarea
+              id="product-description"
+              {...productForm.register("description")}
+              placeholder="Description"
+            />
+            {productForm.formState.errors.description && (
+              <span className="field-error">
+                {productForm.formState.errors.description.message}
+              </span>
+            )}
+          </label>
           <button className="primary-button" disabled={createProduct.isPending}>
             <PackagePlus size={17} /> Create
           </button>
@@ -299,26 +370,68 @@ export function CatalogPage() {
             createVariant.mutate(values),
           )}
         >
-          <select {...variantForm.register("productId")}>
-            <option value="">Select product</option>
-            {products.map((product) => (
-              <option key={product.id} value={product.id}>
-                {product.name}
-              </option>
-            ))}
-          </select>
-          <input {...variantForm.register("name")} placeholder="Variant name" />
-          <input {...variantForm.register("sku")} placeholder="SKU" />
-          <input
-            {...variantForm.register("price")}
-            type="number"
-            placeholder="Price"
-          />
-          <input
-            {...variantForm.register("stock")}
-            type="number"
-            placeholder="Stock"
-          />
+          <label htmlFor="variant-productId">
+            Product
+            <select id="variant-productId" {...variantForm.register("productId")}>
+              <option value="">Select product</option>
+              {products.map((product) => (
+                <option key={product.id} value={product.id}>
+                  {product.name}
+                </option>
+              ))}
+            </select>
+            {variantForm.formState.errors.productId && (
+              <span className="field-error">
+                {variantForm.formState.errors.productId.message}
+              </span>
+            )}
+          </label>
+          <label htmlFor="variant-name">
+            Variant name
+            <input id="variant-name" {...variantForm.register("name")} placeholder="Variant name" />
+            {variantForm.formState.errors.name && (
+              <span className="field-error">
+                {variantForm.formState.errors.name.message}
+              </span>
+            )}
+          </label>
+          <label htmlFor="variant-sku">
+            SKU
+            <input id="variant-sku" {...variantForm.register("sku")} placeholder="SKU" />
+            {variantForm.formState.errors.sku && (
+              <span className="field-error">
+                {variantForm.formState.errors.sku.message}
+              </span>
+            )}
+          </label>
+          <label htmlFor="variant-price">
+            Price
+            <input
+              id="variant-price"
+              {...variantForm.register("price")}
+              type="number"
+              placeholder="Price"
+            />
+            {variantForm.formState.errors.price && (
+              <span className="field-error">
+                {variantForm.formState.errors.price.message}
+              </span>
+            )}
+          </label>
+          <label htmlFor="variant-stock">
+            Stock
+            <input
+              id="variant-stock"
+              {...variantForm.register("stock")}
+              type="number"
+              placeholder="Stock"
+            />
+            {variantForm.formState.errors.stock && (
+              <span className="field-error">
+                {variantForm.formState.errors.stock.message}
+              </span>
+            )}
+          </label>
           <button className="primary-button" disabled={createVariant.isPending}>
             <Tags size={17} /> Add variant
           </button>
@@ -336,17 +449,51 @@ export function CatalogPage() {
             createCategory.mutate(values),
           )}
         >
-          <input
-            {...categoryForm.register("name")}
-            placeholder="Category name"
-          />
-          <input {...categoryForm.register("slug")} placeholder="Slug" />
-          <input {...categoryForm.register("icon")} placeholder="Icon" />
-          <input
-            {...categoryForm.register("sortOrder")}
-            type="number"
-            placeholder="Sort order"
-          />
+          <label htmlFor="category-name">
+            Category name
+            <input
+              id="category-name"
+              {...categoryForm.register("name")}
+              placeholder="Category name"
+            />
+            {categoryForm.formState.errors.name && (
+              <span className="field-error">
+                {categoryForm.formState.errors.name.message}
+              </span>
+            )}
+          </label>
+          <label htmlFor="category-slug">
+            Slug
+            <input id="category-slug" {...categoryForm.register("slug")} placeholder="Slug" />
+            {categoryForm.formState.errors.slug && (
+              <span className="field-error">
+                {categoryForm.formState.errors.slug.message}
+              </span>
+            )}
+          </label>
+          <label htmlFor="category-icon">
+            Icon
+            <input id="category-icon" {...categoryForm.register("icon")} placeholder="Icon" />
+            {categoryForm.formState.errors.icon && (
+              <span className="field-error">
+                {categoryForm.formState.errors.icon.message}
+              </span>
+            )}
+          </label>
+          <label htmlFor="category-sortOrder">
+            Sort order
+            <input
+              id="category-sortOrder"
+              {...categoryForm.register("sortOrder")}
+              type="number"
+              placeholder="Sort order"
+            />
+            {categoryForm.formState.errors.sortOrder && (
+              <span className="field-error">
+                {categoryForm.formState.errors.sortOrder.message}
+              </span>
+            )}
+          </label>
           <button
             className="primary-button"
             disabled={createCategory.isPending}
@@ -366,7 +513,7 @@ function ImageAttachForm({
 }: {
   products: Product[];
   isPending: boolean;
-  onAdd: (productId: string, url: string) => Promise<ProductImage>;
+  onAdd: (productId: string, url: string) => Promise<ProductImage | undefined>;
 }) {
   const form = useForm<ImageFormInput, unknown, ImageForm>({
     resolver: zodResolver(imageSchema),
@@ -387,15 +534,29 @@ function ImageAttachForm({
         () => toast.error("Select a product and enter a valid image URL"),
       )}
     >
-      <select {...form.register("productId")}>
-        <option value="">Image target</option>
-        {products.map((product) => (
-          <option key={product.id} value={product.id}>
-            {product.name}
-          </option>
-        ))}
-      </select>
-      <input {...form.register("url")} placeholder="Image URL" />
+      <label htmlFor="image-productId">
+        Image target
+        <select id="image-productId" {...form.register("productId")}>
+          <option value="">Image target</option>
+          {products.map((product) => (
+            <option key={product.id} value={product.id}>
+              {product.name}
+            </option>
+          ))}
+        </select>
+        {form.formState.errors.productId && (
+          <span className="field-error">
+            {form.formState.errors.productId.message}
+          </span>
+        )}
+      </label>
+      <label htmlFor="image-url">
+        Image URL
+        <input id="image-url" {...form.register("url")} placeholder="Image URL" />
+        {form.formState.errors.url && (
+          <span className="field-error">{form.formState.errors.url.message}</span>
+        )}
+      </label>
       <button className="ghost-button" type="submit" disabled={isPending}>
         <ImagePlus size={16} /> Attach image
       </button>

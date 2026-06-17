@@ -10,6 +10,7 @@ import {
   Users,
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useCallback, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { API_BASE_URL, request } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -33,8 +34,10 @@ const nav = [
 export function Shell() {
   const { session, logout } = useAuth();
   const queryClient = useQueryClient();
+  const [loggingOut, setLoggingOut] = useState(false);
 
-  async function handleLogout() {
+  const handleLogout = useCallback(async () => {
+    setLoggingOut(true);
     try {
       if (session) {
         await request("/auth/logout", {
@@ -45,8 +48,9 @@ export function Shell() {
     } finally {
       queryClient.clear();
       logout();
+      setLoggingOut(false);
     }
-  }
+  }, [session, queryClient, logout]);
 
   return (
     <div className="shell">
@@ -81,8 +85,13 @@ export function Shell() {
           <span className="eyebrow">operator</span>
           <strong>{session?.user.name}</strong>
           <small>{session?.user.email}</small>
-          <button type="button" className="ghost-button" onClick={handleLogout}>
-            <LogOut size={16} /> Logout
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={handleLogout}
+            disabled={loggingOut}
+          >
+            <LogOut size={16} /> {loggingOut ? "Signing out..." : "Logout"}
           </button>
         </div>
       </aside>

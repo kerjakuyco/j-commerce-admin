@@ -20,19 +20,21 @@ export function UploadPage() {
       const body = new FormData();
       if (files.length === 1) {
         body.append("file", files[0]);
-        const result = await request<UploadedFile>("/upload/image", {
+        const single = await request<UploadedFile>("/upload/image", {
           token,
           method: "POST",
           body,
+          timeoutMs: 60_000,
         });
-        return [result];
+        return single ? [single] : [];
       }
       Array.from(files).forEach((file) => body.append("files", file));
-      return request<UploadedFile[]>("/upload/images", {
+      return (await request<UploadedFile[]>("/upload/images", {
         token,
         method: "POST",
         body,
-      });
+        timeoutMs: 60_000,
+      })) ?? [];
     },
     onSuccess: (result) => {
       setUploaded(result);
