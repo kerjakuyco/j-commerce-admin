@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { TicketPlus } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { DataTable } from "../components/DataTable";
@@ -14,18 +14,27 @@ import { ApiError, request } from "../lib/api";
 import { money, readError, shortDate, toNumber } from "../lib/format";
 import type { Paginated, Voucher, VoucherType } from "../types";
 
-const voucherSchema = z.object({
-  code: z.string().min(3),
-  type: z.enum(["FIXED", "PERCENTAGE"]),
-  value: z.coerce.number().min(0),
-  minPurchase: z.coerce.number().min(0),
-  maxDiscount: z.preprocess(
-    (value) => (value === "" ? undefined : value),
-    z.coerce.number().optional(),
-  ),
-  quota: z.coerce.number().int().min(1),
-  expiresAt: z.string().min(1),
-});
+const voucherSchema = z
+  .object({
+    code: z.string().min(3),
+    type: z.enum(["FIXED", "PERCENTAGE"]),
+    value: z.coerce.number().min(0),
+    minPurchase: z.coerce.number().min(0),
+    maxDiscount: z.preprocess(
+      (value) => (value === "" ? undefined : value),
+      z.coerce.number().optional(),
+    ),
+    quota: z.coerce.number().int().min(1),
+    expiresAt: z.string().min(1),
+  })
+  // A PERCENTAGE voucher value above 100 would discount more than the
+  // purchase amount before the maxDiscount/subtotal caps kick in. The backend
+  // also enforces @Max(100) for PERCENTAGE, so reject it client-side too for a
+  // clear inline error instead of a 400 round-trip.
+  .refine((v) => v.type !== "PERCENTAGE" || v.value <= 100, {
+    message: "Percentage value must be 0–100",
+    path: ["value"],
+  });
 
 type VoucherFormInput = z.input<typeof voucherSchema>;
 type VoucherForm = z.output<typeof voucherSchema>;
@@ -60,7 +69,7 @@ export function VouchersPage() {
       expiresAt: "",
     },
   });
-  const expiresAt = form.watch("expiresAt");
+  const expiresAt = useWatch({ control: form.control, name: "expiresAt" });
   const createVoucher = useMutation({
     mutationFn: (values: VoucherForm) =>
       request<Voucher>("/vouchers", {
@@ -69,6 +78,13 @@ export function VouchersPage() {
         body: JSON.stringify({
           ...values,
           code: values.code.toUpperCase(),
+          // datetime-local yields a timezone-naive local string; convert to an
+          // explicit UTC instant so the backend stores exactly what the admin
+          // picked in their local time, instead of re-interpreting the naive
+          // string in the server's local timezone.
+          expiresAt: values.expiresAt
+            ? new Date(values.expiresAt).toISOString()
+            : values.expiresAt,
         }),
       }),
     onSuccess: async () => {
@@ -115,7 +131,11 @@ export function VouchersPage() {
         >
           <label htmlFor="voucher-code">
             Code
-            <input id="voucher-code" {...form.register("code")} placeholder="Code" />
+            <input
+              id="voucher-code"
+              {...form.register("code")}
+              placeholder="Code"
+            />
             {form.formState.errors.code && (
               <span className="field-error">
                 {form.formState.errors.code.message}
@@ -198,10 +218,13 @@ export function VouchersPage() {
               {...form.register("expiresAt")}
               type="datetime-local"
             />
-            {/* datetime-local is timezone-naive; the backend stores the picked
-              value as UTC. Show the admin the exact UTC instant they're saving. */}
+            {/* datetime-local is timezone-naive; we convert to an explicit UTC
+              instant before sending (see createVoucher). Show the admin the
+              exact UTC instant that will be stored. */}
             {expiresAt && (
-              <span className="field-hint">Stored as UTC: {expiresAt}:00Z</span>
+              <span className="field-hint">
+                Stored as UTC: {new Date(expiresAt).toISOString()}
+              </span>
             )}
             {form.formState.errors.expiresAt && (
               <span className="field-error">

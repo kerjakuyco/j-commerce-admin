@@ -83,7 +83,10 @@ export function OrdersPage() {
           <div key={`${order.id}-actions`} className="table-actions">
             <select
               value={order.status}
-              disabled={statusMutation.isPending}
+              disabled={
+                statusMutation.isPending &&
+                statusMutation.variables?.id === order.id
+              }
               onChange={(event) => {
                 const value = event.target.value;
                 // Validate before casting; CANCELLED must route through Cancel.
@@ -115,7 +118,10 @@ export function OrdersPage() {
               <button
                 className="table-button"
                 type="button"
-                disabled={cancelMutation.isPending}
+                disabled={
+                  cancelMutation.isPending &&
+                  cancelMutation.variables === order.id
+                }
                 onClick={() => {
                   if (window.confirm(`Cancel order ${order.orderNumber}?`)) {
                     cancelMutation.mutate(order.id);
