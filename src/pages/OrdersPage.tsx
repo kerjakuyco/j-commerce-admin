@@ -6,7 +6,11 @@ import { ErrorState } from "../components/ErrorState";
 import { LoadingState } from "../components/LoadingState";
 import { Panel } from "../components/Panel";
 import { useToken } from "../context/AuthContext";
-import { allowedStatusTransitions, isOrderStatus, orderStatuses } from "../lib/constants";
+import {
+  allowedStatusTransitions,
+  isOrderStatus,
+  orderStatuses,
+} from "../lib/constants";
 import { request } from "../lib/api";
 import { money, readError, shortDate } from "../lib/format";
 import type { Order, OrderStatus, Paginated } from "../types";
@@ -54,6 +58,7 @@ export function OrdersPage() {
   return (
     <Panel title="Order management" eyebrow="fulfillment">
       <DataTable
+        caption="Order management table"
         columns={[
           { label: "Invoice", key: "invoice" },
           { label: "Customer", key: "customer" },
@@ -82,6 +87,8 @@ export function OrdersPage() {
           money(order.total),
           <div key={`${order.id}-actions`} className="table-actions">
             <select
+              aria-label={`Update status for ${order.orderNumber}`}
+              name={`status-${order.id}`}
               value={order.status}
               disabled={
                 statusMutation.isPending &&
@@ -91,6 +98,14 @@ export function OrdersPage() {
                 const value = event.target.value;
                 // Validate before casting; CANCELLED must route through Cancel.
                 if (!isOrderStatus(value)) return;
+                if (value === order.status) return;
+                if (
+                  !window.confirm(
+                    `Move order ${order.orderNumber} from ${order.status} to ${value}?`,
+                  )
+                ) {
+                  return;
+                }
                 statusMutation.mutate({ id: order.id, status: value });
               }}
             >

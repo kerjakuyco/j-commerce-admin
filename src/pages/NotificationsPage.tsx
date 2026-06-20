@@ -12,9 +12,9 @@ import { readError } from "../lib/format";
 import type { NotificationType } from "../types";
 
 const notificationSchema = z.object({
-  type: z.enum(["PROMO", "ORDER", "SYSTEM"]),
-  title: z.string().min(3),
-  body: z.string().min(8),
+  type: z.enum(["PROMO", "SYSTEM"]),
+  title: z.string().min(3).max(120),
+  body: z.string().min(8).max(1000),
 });
 
 type NotificationFormInput = z.input<typeof notificationSchema>;
@@ -82,7 +82,7 @@ export function NotificationsPage() {
             <textarea
               id="notification-body"
               {...form.register("body")}
-              placeholder="Write the broadcast body..."
+              placeholder="Write the broadcast body…"
             />
             {form.formState.errors.body && (
               <span className="field-error">
@@ -90,9 +90,13 @@ export function NotificationsPage() {
               </span>
             )}
           </label>
-          <button className="primary-button" disabled={mutation.isPending}>
+          <button
+            className="primary-button"
+            type="submit"
+            disabled={mutation.isPending}
+          >
             <Radio size={17} />{" "}
-            {mutation.isPending ? "Sending..." : "Send broadcast"}
+            {mutation.isPending ? "Sending…" : "Send broadcast"}
           </button>
         </form>
       </Panel>

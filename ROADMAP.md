@@ -16,13 +16,13 @@
 - Polish UI toward a Google-like product-console design system.
 - Validate with `npm run lint` and `npm run build`.
 
-## Phase 1: Safety Fixes
+## Phase 1: Safety Fixes (Completed)
 
-- Remove `CANCELLED` from generic order status dropdown or call `/orders/:id/cancel` for cancellations.
-- Prevent disabling the current admin account.
-- Restrict user page actions to safe customer/admin operations.
-- Add upload file-count validation before API call.
-- Add visible form labels and inline validation messages across create/edit forms.
+- [x] Remove `CANCELLED` from generic order status dropdown or call `/orders/:id/cancel` for cancellations.
+- [x] Prevent disabling the current admin account.
+- [x] Restrict user page actions to safe customer/admin operations.
+- [x] Add upload file-count validation before API call.
+- [x] Add visible form labels and inline validation messages across create/edit forms.
 
 ## Phase 2: Admin-Grade Data Contracts
 

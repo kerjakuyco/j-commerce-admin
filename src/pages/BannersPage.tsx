@@ -10,27 +10,21 @@ import { LoadingState } from "../components/LoadingState";
 import { Panel } from "../components/Panel";
 import { useToken } from "../context/AuthContext";
 import { request } from "../lib/api";
+import { assetUrlMessage, isAssetUrl } from "../lib/asset-url";
 import { readError } from "../lib/format";
 import type { Banner } from "../types";
 
 const bannerSchema = z.object({
   title: z.string().min(3),
-  image: z.string().url(),
+  image: z.string().trim().min(1).refine(isAssetUrl, {
+    message: assetUrlMessage,
+  }),
   link: z.string().optional(),
-  sortOrder: z.coerce.number().int().min(0),
+  sortOrder: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.coerce.number().int().min(0),
+  ),
 });
-
-function isSafeImageUrl(url: string) {
-  // Relative paths are same-origin and safe; remote images must be HTTPS so a
-  // banner URL can't pull in mixed-content or insecure assets.
-  if (url.startsWith("/")) return true;
-  try {
-    const parsed = new URL(url);
-    return parsed.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
 
 type BannerFormInput = z.input<typeof bannerSchema>;
 type BannerForm = z.output<typeof bannerSchema>;
@@ -40,7 +34,8 @@ export function BannersPage() {
   const queryClient = useQueryClient();
   const bannersQuery = useQuery({
     queryKey: ["banners"],
-    queryFn: ({ signal }) => request<Banner[]>("/banners/admin/all", { token, signal }),
+    queryFn: ({ signal }) =>
+      request<Banner[]>("/banners/admin/all", { token, signal }),
   });
   const form = useForm<BannerFormInput, unknown, BannerForm>({
     resolver: zodResolver(bannerSchema),
@@ -93,7 +88,16 @@ export function BannersPage() {
         <div className="banner-wall">
           {(bannersQuery.data ?? []).map((banner) => (
             <article className="banner-card" key={banner.id}>
-              {isSafeImageUrl(banner.image) && <img src={banner.image} alt="" />}
+              {isAssetUrl(banner.image) && (
+                <img
+                  src={banner.image}
+                  alt={banner.title}
+                  width="320"
+                  height="180"
+                  loading="lazy"
+                  decoding="async"
+                />
+              )}
               <div>
                 <strong>{banner.title}</strong>
                 <span>
@@ -117,7 +121,8 @@ export function BannersPage() {
                   }
                 }}
               >
-                <Trash2 size={16} /> {banner.isActive ? "Deactivate" : "Activate"}
+                <Trash2 size={16} />{" "}
+                {banner.isActive ? "Deactivate" : "Activate"}
               </button>
             </article>
           ))}
@@ -130,7 +135,11 @@ export function BannersPage() {
         >
           <label htmlFor="banner-title">
             Title
-            <input id="banner-title" {...form.register("title")} placeholder="Title" />
+            <input
+              id="banner-title"
+              {...form.register("title")}
+              placeholder="Title"
+            />
             {form.formState.errors.title && (
               <span className="field-error">
                 {form.formState.errors.title.message}
@@ -139,7 +148,11 @@ export function BannersPage() {
           </label>
           <label htmlFor="banner-image">
             Image URL
-            <input id="banner-image" {...form.register("image")} placeholder="Image URL" />
+            <input
+              id="banner-image"
+              {...form.register("image")}
+              placeholder="Image URL"
+            />
             {form.formState.errors.image && (
               <span className="field-error">
                 {form.formState.errors.image.message}
@@ -148,7 +161,11 @@ export function BannersPage() {
           </label>
           <label htmlFor="banner-link">
             Link
-            <input id="banner-link" {...form.register("link")} placeholder="Link" />
+            <input
+              id="banner-link"
+              {...form.register("link")}
+              placeholder="Link"
+            />
             {form.formState.errors.link && (
               <span className="field-error">
                 {form.formState.errors.link.message}
@@ -169,7 +186,11 @@ export function BannersPage() {
               </span>
             )}
           </label>
-          <button className="primary-button" disabled={createBanner.isPending}>
+          <button
+            className="primary-button"
+            type="submit"
+            disabled={createBanner.isPending}
+          >
             <Megaphone size={17} /> Publish banner
           </button>
         </form>

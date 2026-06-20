@@ -1,5 +1,6 @@
 import { useMutation } from "@tanstack/react-query";
 import { Copy, UploadCloud } from "lucide-react";
+import type { DragEvent } from "react";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { Panel } from "../components/Panel";
@@ -29,12 +30,14 @@ export function UploadPage() {
         return single ? [single] : [];
       }
       Array.from(files).forEach((file) => body.append("files", file));
-      return (await request<UploadedFile[]>("/upload/images", {
-        token,
-        method: "POST",
-        body,
-        timeoutMs: 60_000,
-      })) ?? [];
+      return (
+        (await request<UploadedFile[]>("/upload/images", {
+          token,
+          method: "POST",
+          body,
+          timeoutMs: 60_000,
+        })) ?? []
+      );
     },
     onSuccess: (result) => {
       setUploaded(result);
@@ -65,6 +68,11 @@ export function UploadPage() {
     }
   }
 
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    handleFiles(event.dataTransfer.files);
+  }
+
   function validateFiles(fileList: FileList) {
     const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
     if (fileList.length > 5) throw new Error("Upload a maximum of 5 files");
@@ -81,7 +89,11 @@ export function UploadPage() {
   return (
     <div className="upload-layout">
       <Panel title="Upload assets" eyebrow="jpg png webp">
-        <div className="dropzone">
+        <div
+          className="dropzone"
+          onDragOver={(event) => event.preventDefault()}
+          onDrop={handleDrop}
+        >
           <UploadCloud size={42} />
           <strong>Drop-ready local upload</strong>
           <span>
@@ -89,6 +101,8 @@ export function UploadPage() {
             path.
           </span>
           <input
+            aria-label="Choose image files"
+            name="files"
             ref={inputRef}
             type="file"
             accept="image/jpeg,image/png,image/webp"

@@ -1,6 +1,6 @@
 # j-commerce-admin
 
-Admin web untuk `j-commerce-api`, dibangun dengan Vite, React 19, TypeScript 6, TanStack Query, React Router, Recharts, Motion, React Hook Form, dan Zod.
+Admin web untuk `j-commerce-api`, dibangun dengan Vite, React 19, TypeScript 6, TanStack Query, React Router, Recharts, React Hook Form, dan Zod.
 
 ## Tech Stack
 
@@ -43,4 +43,5 @@ admin@jcommerce.com / admin123
 - `npm run dev` starts Vite dev server
 - `npm run build` typechecks and builds production assets
 - `npm run lint` runs ESLint
+- `npm run test` runs Vitest tests
 - `npm run preview` previews production build

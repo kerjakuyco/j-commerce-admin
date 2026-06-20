@@ -56,10 +56,11 @@ Status: implemented admin console for `j-commerce-api`.
 
 ## Vouchers
 
-- Active voucher table.
+- Voucher table backed by the admin list endpoint, including inactive, expired, and exhausted records.
 - Create voucher form with type, value, quota, validity, minimum purchase, and maximum discount.
 - API endpoints used:
-  - `GET /vouchers?limit=100`
+  - `GET /vouchers/admin/all?limit=100`
+  - fallback: `GET /vouchers?limit=100`
   - `POST /vouchers`
 
 ## Notifications
@@ -70,12 +71,14 @@ Status: implemented admin console for `j-commerce-api`.
 
 ## Banners
 
-- Active banner wall with image previews.
+- Banner wall with active/inactive image previews.
 - Create banner form.
 - Deactivate/delete banner action.
 - API endpoints used:
-  - `GET /banners`
+  - `GET /banners/admin/all`
+  - fallback: `GET /banners`
   - `POST /banners`
+  - `PATCH /banners/:id`
   - `DELETE /banners/:id`
 
 ## Upload

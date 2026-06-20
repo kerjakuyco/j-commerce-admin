@@ -104,31 +104,31 @@ export function DashboardPage() {
             <ResponsiveContainer width="100%" height={280}>
               <AreaChart data={revenue}>
                 <defs>
-                  <linearGradient id="emberFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#C0573C" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#C0573C" stopOpacity={0.02} />
+                  <linearGradient id="revenueFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#2563EB" stopOpacity={0.26} />
+                    <stop offset="95%" stopColor="#2563EB" stopOpacity={0.02} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid stroke="rgba(107,93,79,.16)" vertical={false} />
+                <CartesianGrid stroke="rgba(100,116,139,.16)" vertical={false} />
                 <XAxis
                   dataKey="date"
-                  stroke="#6b5d4f"
+                  stroke="#64748B"
                   tickLine={false}
                   axisLine={false}
                 />
-                <YAxis stroke="#6b5d4f" tickLine={false} axisLine={false} />
+                <YAxis stroke="#64748B" tickLine={false} axisLine={false} />
                 <Tooltip
                   contentStyle={{
-                    background: "#fffefb",
-                    border: "1px solid #e7dfd4",
+                    background: "#FEFEFF",
+                    border: "1px solid #E2E8F0",
                     borderRadius: 14,
                   }}
                 />
                 <Area
                   type="monotone"
                   dataKey="total"
-                  stroke="#C0573C"
-                  fill="url(#emberFill)"
+                  stroke="#2563EB"
+                  fill="url(#revenueFill)"
                   strokeWidth={2.5}
                 />
               </AreaChart>
@@ -145,29 +145,29 @@ export function DashboardPage() {
           <div className="chart-box">
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={breakdown} layout="vertical">
-                <CartesianGrid stroke="rgba(107,93,79,.16)" horizontal={false} />
+                <CartesianGrid stroke="rgba(100,116,139,.16)" horizontal={false} />
                 <XAxis
                   type="number"
-                  stroke="#6b5d4f"
+                  stroke="#64748B"
                   tickLine={false}
                   axisLine={false}
                 />
                 <YAxis
                   dataKey="status"
                   type="category"
-                  stroke="#6b5d4f"
+                  stroke="#64748B"
                   tickLine={false}
                   axisLine={false}
                   width={92}
                 />
                 <Tooltip
                   contentStyle={{
-                    background: "#fffefb",
-                    border: "1px solid #e7dfd4",
+                    background: "#FEFEFF",
+                    border: "1px solid #E2E8F0",
                     borderRadius: 14,
                   }}
                 />
-                <Bar dataKey="count" fill="#3E8E5A" radius={[0, 8, 8, 0]} />
+                <Bar dataKey="count" fill="#16A34A" radius={[0, 8, 8, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

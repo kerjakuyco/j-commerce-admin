@@ -1,25 +1,37 @@
-type ColumnDef = { label: string; key: string } | string
+type ColumnDef = { label: string; key: string } | string;
 
 export function DataTable({
   columns,
   rows,
-  empty = 'No records yet.',
+  empty = "No records yet.",
   keyExtractor,
+  caption,
 }: {
-  columns: ColumnDef[]
-  rows: React.ReactNode[][]
-  empty?: string
-  keyExtractor?: (row: React.ReactNode[], index: number) => string | number
+  columns: ColumnDef[];
+  rows: React.ReactNode[][];
+  empty?: string;
+  keyExtractor?: (row: React.ReactNode[], index: number) => string | number;
+  caption: string;
 }) {
   return (
-    <div className="table-frame">
+    <div
+      className="table-frame"
+      role="region"
+      aria-label={caption}
+      tabIndex={0}
+    >
       <table>
+        <caption className="sr-only">{caption}</caption>
         <thead>
           <tr>
             {columns.map((column) => {
-              const key = typeof column === 'string' ? column : column.key
-              const label = typeof column === 'string' ? column : column.label
-              return <th key={key}>{label}</th>
+              const key = typeof column === "string" ? column : column.key;
+              const label = typeof column === "string" ? column : column.label;
+              return (
+                <th key={key} scope="col">
+                  {label}
+                </th>
+              );
             })}
           </tr>
         </thead>
@@ -34,7 +46,13 @@ export function DataTable({
             rows.map((row, index) => (
               <tr key={keyExtractor ? keyExtractor(row, index) : index}>
                 {row.map((cell, cellIndex) => (
-                  <td key={cellIndex}>{cell}</td>
+                  <td key={cellIndex}>
+                    {typeof cell === "string" || typeof cell === "number" ? (
+                      <span className="table-cell-text">{cell}</span>
+                    ) : (
+                      cell
+                    )}
+                  </td>
                 ))}
               </tr>
             ))
@@ -42,5 +60,5 @@ export function DataTable({
         </tbody>
       </table>
     </div>
-  )
+  );
 }

@@ -1,29 +1,32 @@
 :root {
-  --bg: oklch(97.8% 0.006 70);
-  --surface: oklch(99.1% 0.005 70);
-  --surface-2: oklch(96.2% 0.009 65);
-  --surface-3: oklch(93.8% 0.013 58);
-  --ink: oklch(24% 0.012 55);
-  --muted: oklch(49% 0.018 55);
-  --subtle: oklch(62% 0.015 55);
-  --line: oklch(88.5% 0.01 60);
-  --line-strong: oklch(80% 0.02 55);
-  --primary: oklch(53.5% 0.15 37);
-  --primary-ink: oklch(99% 0.006 70);
-  --primary-soft: oklch(94.6% 0.04 37);
-  --green: oklch(56% 0.12 150);
-  --green-soft: oklch(95% 0.035 150);
-  --red: oklch(60% 0.16 28);
-  --red-soft: oklch(95% 0.035 28);
-  --yellow: oklch(76% 0.12 75);
-  --yellow-soft: oklch(95.5% 0.04 75);
-  --blue-soft: oklch(95% 0.018 235);
+  --bg: oklch(99% 0.003 260);
+  --surface: oklch(99.7% 0.002 260);
+  --surface-2: oklch(97.7% 0.007 250);
+  --surface-3: oklch(94.8% 0.011 250);
+  --ink: oklch(22% 0.032 263);
+  --muted: oklch(50% 0.03 255);
+  --subtle: oklch(64% 0.025 250);
+  --line: oklch(90% 0.014 250);
+  --line-strong: oklch(82.5% 0.022 250);
+  --primary: oklch(54.6% 0.215 262);
+  --primary-ink: oklch(99% 0.003 260);
+  --primary-soft: oklch(95% 0.032 262);
+  --green: oklch(62% 0.17 148);
+  --green-soft: oklch(96% 0.04 148);
+  --red: oklch(58% 0.22 22);
+  --red-soft: oklch(96% 0.035 22);
+  --yellow: oklch(78% 0.16 76);
+  --yellow-soft: oklch(96.5% 0.05 76);
+  --blue-soft: oklch(95% 0.032 262);
+  --pink: oklch(56% 0.21 350);
+  --orange: oklch(65% 0.2 45);
+  --purple: oklch(57% 0.22 300);
+  --cyan: oklch(62% 0.16 220);
+  --teal: oklch(60% 0.14 185);
   --shadow:
-    0 1px 2px oklch(24% 0.012 55 / 0.08),
-    0 18px 50px oklch(24% 0.012 55 / 0.07);
+    0 1px 2px oklch(32% 0.08 260 / 0.08), 0 18px 50px oklch(32% 0.08 260 / 0.08);
   --shadow-soft:
-    0 1px 2px oklch(24% 0.012 55 / 0.06),
-    0 10px 28px oklch(24% 0.012 55 / 0.05);
+    0 1px 2px oklch(32% 0.08 260 / 0.06), 0 10px 28px oklch(32% 0.08 260 / 0.05);
   --radius-sm: 10px;
   --radius-md: 16px;
   --radius-lg: 24px;
@@ -55,15 +58,27 @@ body {
   background:
     radial-gradient(
       circle at 8% 0%,
-      oklch(94.5% 0.045 37 / 0.8),
+      oklch(94.5% 0.05 262 / 0.72),
       transparent 34%
     ),
     radial-gradient(
       circle at 92% 4%,
-      oklch(96% 0.045 75 / 0.5),
+      oklch(96% 0.05 185 / 0.58),
       transparent 30%
     ),
     var(--bg);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 button,
@@ -78,7 +93,7 @@ input:focus-visible,
 textarea:focus-visible,
 select:focus-visible,
 a:focus-visible {
-  outline: 3px solid oklch(77% 0.1 37 / 0.5);
+  outline: 3px solid oklch(72% 0.14 262 / 0.42);
   outline-offset: 2px;
 }
 
@@ -111,7 +126,7 @@ input:focus,
 textarea:focus,
 select:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 4px oklch(53.5% 0.15 37 / 0.12);
+  box-shadow: 0 0 0 4px oklch(54.6% 0.215 262 / 0.12);
   outline: none;
 }
 
@@ -180,14 +195,14 @@ code {
   position: relative;
   overflow: hidden;
   background:
-    linear-gradient(135deg, oklch(94.8% 0.045 37), oklch(96.5% 0.04 75)),
+    linear-gradient(135deg, oklch(95% 0.052 262), oklch(96.5% 0.045 185)),
     var(--surface-2);
 }
 
 .poster-lines {
   position: absolute;
   inset: 32px;
-  border: 1px solid oklch(78% 0.06 37 / 0.4);
+  border: 1px solid oklch(73% 0.08 262 / 0.34);
   border-radius: 28px;
   pointer-events: none;
 }
@@ -197,7 +212,7 @@ code {
   content: "";
   position: absolute;
   border-radius: 999px;
-  background: oklch(53.5% 0.15 37 / 0.22);
+  background: oklch(54.6% 0.215 262 / 0.18);
 }
 
 .poster-lines::before {
@@ -212,7 +227,7 @@ code {
   height: 94px;
   right: 28%;
   top: 32%;
-  background: oklch(72% 0.13 75 / 0.22);
+  background: oklch(65% 0.16 185 / 0.2);
 }
 
 .login-poster h1 {
@@ -251,7 +266,8 @@ code {
   height: 100vh;
   padding: 18px;
   border-inline-end: 1px solid var(--line);
-  background: oklch(98.8% 0.006 70 / 0.96);
+  background: oklch(99.2% 0.004 260 / 0.96);
+  backdrop-filter: blur(16px);
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -275,7 +291,7 @@ code {
   font-family: var(--display);
   font-weight: 800;
   letter-spacing: -0.04em;
-  box-shadow: 0 10px 24px oklch(53.5% 0.15 37 / 0.25);
+  box-shadow: 0 10px 24px oklch(54.6% 0.215 262 / 0.24);
 }
 
 .brand strong,
@@ -306,7 +322,7 @@ code {
   gap: 12px;
   align-items: center;
   border: 1px solid transparent;
-  color: var(--ink);
+  color: var(--muted);
   text-decoration: none;
   padding: 11px 12px;
   border-radius: 999px;
@@ -316,14 +332,51 @@ code {
     border-color 160ms ease;
 }
 
+.nav-link svg {
+  color: var(--nav-accent, var(--primary));
+}
+
+.nav-link:nth-child(1) {
+  --nav-accent: var(--primary);
+}
+
+.nav-link:nth-child(2) {
+  --nav-accent: var(--green);
+}
+
+.nav-link:nth-child(3) {
+  --nav-accent: var(--cyan);
+}
+
+.nav-link:nth-child(4) {
+  --nav-accent: var(--purple);
+}
+
+.nav-link:nth-child(5) {
+  --nav-accent: var(--pink);
+}
+
+.nav-link:nth-child(6) {
+  --nav-accent: var(--orange);
+}
+
+.nav-link:nth-child(7) {
+  --nav-accent: var(--teal);
+}
+
+.nav-link:nth-child(8) {
+  --nav-accent: var(--red);
+}
+
 .nav-link:hover {
   background: var(--surface-2);
+  color: var(--ink);
 }
 
 .nav-link.active {
   background: var(--primary-soft);
   color: var(--primary);
-  border-color: oklch(53.5% 0.15 37 / 0.18);
+  border-color: oklch(54.6% 0.215 262 / 0.18);
   font-weight: 700;
 }
 
@@ -402,7 +455,7 @@ code {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  box-shadow: 0 1px 2px oklch(24% 0.012 55 / 0.04);
+  box-shadow: 0 1px 2px oklch(32% 0.08 260 / 0.05);
 }
 
 .api-status span {
@@ -456,7 +509,8 @@ code {
   flex-direction: column;
   justify-content: flex-end;
   background:
-    linear-gradient(135deg, var(--primary-soft), oklch(96.5% 0.04 75)),
+    radial-gradient(circle at 84% 18%, oklch(91% 0.07 185 / 0.58), transparent 34%),
+    linear-gradient(135deg, var(--primary-soft), oklch(98% 0.012 250)),
     var(--surface);
 }
 
@@ -509,6 +563,11 @@ code {
   border-radius: var(--radius-md);
 }
 
+.table-frame:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px oklch(54.6% 0.215 262 / 0.12);
+}
+
 table {
   border-collapse: collapse;
   width: 100%;
@@ -522,6 +581,14 @@ td {
   padding: 13px 12px;
   border-bottom: 1px solid var(--line);
   vertical-align: middle;
+}
+
+.table-cell-text {
+  display: block;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 tbody tr:hover {
@@ -564,6 +631,11 @@ th {
   padding: 6px 2px;
   background: transparent;
   box-shadow: none;
+}
+
+.toolbar:focus-within {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px oklch(54.6% 0.215 262 / 0.12);
 }
 
 .control-form {
@@ -609,13 +681,13 @@ th {
   color: var(--primary-ink);
   background: var(--primary);
   border-color: var(--primary);
-  box-shadow: 0 8px 20px oklch(53.5% 0.15 37 / 0.18);
+  box-shadow: 0 8px 20px oklch(54.6% 0.215 262 / 0.2);
 }
 
 .primary-button:hover {
   color: var(--primary-ink);
-  background: oklch(48.5% 0.155 37);
-  border-color: oklch(48.5% 0.155 37);
+  background: oklch(49% 0.22 262);
+  border-color: oklch(49% 0.22 262);
 }
 
 .primary-button:disabled,
@@ -650,17 +722,17 @@ th {
 }
 
 .badge-good {
-  color: oklch(42% 0.13 148);
+  color: oklch(40% 0.15 148);
   background: var(--green-soft);
 }
 
 .badge-warn {
-  color: oklch(44% 0.12 85);
+  color: oklch(45% 0.15 76);
   background: var(--yellow-soft);
 }
 
 .badge-danger {
-  color: oklch(45% 0.17 26);
+  color: oklch(45% 0.2 22);
   background: var(--red-soft);
 }
 
@@ -727,7 +799,9 @@ th {
   gap: 14px;
   padding: 28px;
   text-align: center;
-  background: var(--surface-2);
+  background:
+    radial-gradient(circle at 50% 18%, oklch(95% 0.032 262 / 0.7), transparent 30%),
+    var(--surface-2);
 }
 
 .dropzone span {
@@ -750,7 +824,7 @@ th {
 .loading-state span {
   width: 34px;
   height: 34px;
-  border: 3px solid var(--surface-3);
+  border: 3px solid oklch(93.5% 0.012 250);
   border-top-color: var(--primary);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;

@@ -59,7 +59,13 @@ export function LoginPage() {
           </div>
           <label htmlFor="login-email">
             Email
-            <input id="login-email" {...form.register("email")} />
+            <input
+              id="login-email"
+              type="email"
+              autoComplete="username"
+              spellCheck={false}
+              {...form.register("email")}
+            />
             {form.formState.errors.email && (
               <span className="field-error">
                 {form.formState.errors.email.message}
@@ -68,7 +74,12 @@ export function LoginPage() {
           </label>
           <label htmlFor="login-password">
             Password
-            <input id="login-password" type="password" {...form.register("password")} />
+            <input
+              id="login-password"
+              type="password"
+              autoComplete="current-password"
+              {...form.register("password")}
+            />
             {form.formState.errors.password && (
               <span className="field-error">
                 {form.formState.errors.password.message}

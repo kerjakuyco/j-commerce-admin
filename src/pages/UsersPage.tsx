@@ -31,6 +31,7 @@ export function UsersPage() {
         `/users?limit=80&search=${encodeURIComponent(debouncedSearch)}`,
         { token, signal },
       ),
+    placeholderData: (previousData) => previousData,
   });
   const toggleMutation = useMutation({
     mutationFn: (user: User) =>
@@ -53,14 +54,22 @@ export function UsersPage() {
   return (
     <Panel title="Customers" eyebrow="access control">
       <div className="toolbar">
-        <Search size={18} />
+        <Search size={18} aria-hidden="true" />
+        <label className="sr-only" htmlFor="user-search">
+          Search users
+        </label>
         <input
+          id="user-search"
+          name="search"
+          type="search"
+          autoComplete="off"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search name, email, phone"
         />
       </div>
       <DataTable
+        caption="Customer access table"
         columns={["Name", "Email", "Role", "Joined", "Status", "Action"]}
         rows={(usersQuery.data?.data ?? []).map((user) => {
           const protectedUser =
@@ -85,11 +94,21 @@ export function UsersPage() {
                 // The backend enforces self-disable and protected-admin
                 // rejection; guard here so we never even attempt the call.
                 if (protectedUser) return;
+                if (
+                  user.isActive &&
+                  !window.confirm(`Disable access for ${user.email}?`)
+                ) {
+                  return;
+                }
                 toggleMutation.mutate(user);
               }}
               title={protectedUser ? "Admin accounts are protected" : undefined}
             >
-              {protectedUser ? "Protected" : user.isActive ? "Disable" : "Enable"}
+              {protectedUser
+                ? "Protected"
+                : user.isActive
+                  ? "Disable"
+                  : "Enable"}
             </button>,
           ];
         })}

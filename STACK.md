@@ -82,6 +82,7 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localho
 | `eslint-plugin-react-hooks` | `^7.1.1` | React Hooks lint rules |
 | `eslint-plugin-react-refresh` | `^0.5.2` | React Refresh lint rules |
 | `globals` | `^17.6.0` | Global identifiers for ESLint |
+| `vitest` | `^4.1.9` | Unit test runner |
 | `@types/react` | `^19.2.14` | React type definitions |
 | `@types/react-dom` | `^19.2.3` | React DOM type definitions |
 | `@types/node` | `^24.12.3` | Node.js type definitions |
@@ -95,6 +96,7 @@ export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localho
   "dev": "vite",
   "build": "tsc -b && vite build",
   "lint": "eslint .",
+  "test": "vitest run",
   "preview": "vite preview"
 }
 ```

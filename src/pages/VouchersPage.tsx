@@ -18,8 +18,14 @@ const voucherSchema = z
   .object({
     code: z.string().min(3),
     type: z.enum(["FIXED", "PERCENTAGE"]),
-    value: z.coerce.number().min(0),
-    minPurchase: z.coerce.number().min(0),
+    value: z.preprocess(
+      (value) => (value === "" ? undefined : value),
+      z.coerce.number().min(0),
+    ),
+    minPurchase: z.preprocess(
+      (value) => (value === "" ? undefined : value),
+      z.coerce.number().min(0),
+    ),
     maxDiscount: z.preprocess(
       (value) => (value === "" ? undefined : value),
       z.coerce.number().optional(),
@@ -111,6 +117,7 @@ export function VouchersPage() {
     <div className="split-layout">
       <Panel title="Vouchers" eyebrow="promo rules">
         <DataTable
+          caption="Voucher rules table"
           columns={["Code", "Type", "Value", "Quota", "Minimum", "Expires"]}
           rows={(vouchersQuery.data?.data ?? []).map((voucher) => [
             voucher.code,
@@ -232,7 +239,11 @@ export function VouchersPage() {
               </span>
             )}
           </label>
-          <button className="primary-button" disabled={createVoucher.isPending}>
+          <button
+            className="primary-button"
+            type="submit"
+            disabled={createVoucher.isPending}
+          >
             <TicketPlus size={17} /> Create voucher
           </button>
         </form>

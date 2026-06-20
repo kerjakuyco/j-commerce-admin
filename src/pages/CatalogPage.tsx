@@ -11,6 +11,7 @@ import { LoadingState } from "../components/LoadingState";
 import { Panel } from "../components/Panel";
 import { useToken } from "../context/AuthContext";
 import { request } from "../lib/api";
+import { assetUrlMessage, isAssetUrl } from "../lib/asset-url";
 import { money, readError, slugify } from "../lib/format";
 import type {
   Category,
@@ -24,6 +25,25 @@ const optionalNumber = z.preprocess(
   (value) => (value === "" ? undefined : value),
   z.coerce.number().optional(),
 );
+const requiredNumber = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z.coerce.number(),
+);
+const requiredInt = z.preprocess(
+  (value) => (value === "" ? undefined : value),
+  z.coerce.number().int(),
+);
+const assetUrlSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .refine(isAssetUrl, { message: assetUrlMessage });
+const optionalAssetUrlSchema = z
+  .string()
+  .trim()
+  .refine((value) => value === "" || isAssetUrl(value), {
+    message: assetUrlMessage,
+  });
 
 const productSchema = z.object({
   name: z.string().min(3),
@@ -31,29 +51,29 @@ const productSchema = z.object({
   brand: z.string().min(2),
   description: z.string().min(12),
   categoryId: z.string().min(1),
-  basePrice: z.coerce.number().min(0),
+  basePrice: requiredNumber.pipe(z.number().min(0)),
   discountPrice: optionalNumber,
-  imageUrl: z.string().url().optional().or(z.literal("")),
+  imageUrl: optionalAssetUrlSchema,
 });
 
 const variantSchema = z.object({
   productId: z.string().min(1),
   name: z.string().min(1),
   sku: z.string().min(2),
-  price: z.coerce.number().min(0),
-  stock: z.coerce.number().int().min(0),
+  price: requiredInt.pipe(z.number().int().min(0)),
+  stock: requiredInt.pipe(z.number().int().min(0)),
 });
 
 const categorySchema = z.object({
   name: z.string().min(2),
   slug: z.string().optional(),
   icon: z.string().optional(),
-  sortOrder: z.coerce.number().int().min(0),
+  sortOrder: requiredInt.pipe(z.number().int().min(0)),
 });
 
 const imageSchema = z.object({
   productId: z.string().min(1),
-  url: z.string().url(),
+  url: assetUrlSchema,
 });
 
 type ProductFormInput = z.input<typeof productSchema>;
@@ -75,7 +95,8 @@ export function CatalogPage() {
   });
   const categoriesQuery = useQuery({
     queryKey: ["categories"],
-    queryFn: ({ signal }) => request<Category[]>("/categories", { token, signal }),
+    queryFn: ({ signal }) =>
+      request<Category[]>("/categories", { token, signal }),
   });
 
   const productForm = useForm<ProductFormInput, unknown, ProductForm>({
@@ -175,7 +196,10 @@ export function CatalogPage() {
     // Soft-delete: the storefront hides the product but existing orders keep
     // their snapshots intact.
     mutationFn: (id: string) =>
-      request<{ message: string }>(`/products/${id}`, { token, method: "DELETE" }),
+      request<{ message: string }>(`/products/${id}`, {
+        token,
+        method: "DELETE",
+      }),
     onSuccess: async () => {
       await invalidateCatalog();
       toast.success("Product removed");
@@ -215,6 +239,7 @@ export function CatalogPage() {
         className="span-2"
       >
         <DataTable
+          caption="Product catalog table"
           columns={[
             "Product",
             "Brand",
@@ -259,7 +284,11 @@ export function CatalogPage() {
         >
           <label htmlFor="product-name">
             Name
-            <input id="product-name" {...productForm.register("name")} placeholder="Product name" />
+            <input
+              id="product-name"
+              {...productForm.register("name")}
+              placeholder="Product name"
+            />
             {productForm.formState.errors.name && (
               <span className="field-error">
                 {productForm.formState.errors.name.message}
@@ -281,7 +310,11 @@ export function CatalogPage() {
           </label>
           <label htmlFor="product-brand">
             Brand
-            <input id="product-brand" {...productForm.register("brand")} placeholder="Brand" />
+            <input
+              id="product-brand"
+              {...productForm.register("brand")}
+              placeholder="Brand"
+            />
             {productForm.formState.errors.brand && (
               <span className="field-error">
                 {productForm.formState.errors.brand.message}
@@ -290,7 +323,10 @@ export function CatalogPage() {
           </label>
           <label htmlFor="product-category">
             Category
-            <select id="product-category" {...productForm.register("categoryId")}>
+            <select
+              id="product-category"
+              {...productForm.register("categoryId")}
+            >
               <option value="">Select category</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
@@ -358,7 +394,11 @@ export function CatalogPage() {
               </span>
             )}
           </label>
-          <button className="primary-button" disabled={createProduct.isPending}>
+          <button
+            className="primary-button"
+            type="submit"
+            disabled={createProduct.isPending}
+          >
             <PackagePlus size={17} /> Create
           </button>
         </form>
@@ -372,7 +412,10 @@ export function CatalogPage() {
         >
           <label htmlFor="variant-productId">
             Product
-            <select id="variant-productId" {...variantForm.register("productId")}>
+            <select
+              id="variant-productId"
+              {...variantForm.register("productId")}
+            >
               <option value="">Select product</option>
               {products.map((product) => (
                 <option key={product.id} value={product.id}>
@@ -388,7 +431,11 @@ export function CatalogPage() {
           </label>
           <label htmlFor="variant-name">
             Variant name
-            <input id="variant-name" {...variantForm.register("name")} placeholder="Variant name" />
+            <input
+              id="variant-name"
+              {...variantForm.register("name")}
+              placeholder="Variant name"
+            />
             {variantForm.formState.errors.name && (
               <span className="field-error">
                 {variantForm.formState.errors.name.message}
@@ -397,7 +444,11 @@ export function CatalogPage() {
           </label>
           <label htmlFor="variant-sku">
             SKU
-            <input id="variant-sku" {...variantForm.register("sku")} placeholder="SKU" />
+            <input
+              id="variant-sku"
+              {...variantForm.register("sku")}
+              placeholder="SKU"
+            />
             {variantForm.formState.errors.sku && (
               <span className="field-error">
                 {variantForm.formState.errors.sku.message}
@@ -410,6 +461,7 @@ export function CatalogPage() {
               id="variant-price"
               {...variantForm.register("price")}
               type="number"
+              step="1"
               placeholder="Price"
             />
             {variantForm.formState.errors.price && (
@@ -424,6 +476,7 @@ export function CatalogPage() {
               id="variant-stock"
               {...variantForm.register("stock")}
               type="number"
+              step="1"
               placeholder="Stock"
             />
             {variantForm.formState.errors.stock && (
@@ -432,7 +485,11 @@ export function CatalogPage() {
               </span>
             )}
           </label>
-          <button className="primary-button" disabled={createVariant.isPending}>
+          <button
+            className="primary-button"
+            type="submit"
+            disabled={createVariant.isPending}
+          >
             <Tags size={17} /> Add variant
           </button>
         </form>
@@ -464,7 +521,11 @@ export function CatalogPage() {
           </label>
           <label htmlFor="category-slug">
             Slug
-            <input id="category-slug" {...categoryForm.register("slug")} placeholder="Slug" />
+            <input
+              id="category-slug"
+              {...categoryForm.register("slug")}
+              placeholder="Slug"
+            />
             {categoryForm.formState.errors.slug && (
               <span className="field-error">
                 {categoryForm.formState.errors.slug.message}
@@ -473,7 +534,11 @@ export function CatalogPage() {
           </label>
           <label htmlFor="category-icon">
             Icon
-            <input id="category-icon" {...categoryForm.register("icon")} placeholder="Icon" />
+            <input
+              id="category-icon"
+              {...categoryForm.register("icon")}
+              placeholder="Icon"
+            />
             {categoryForm.formState.errors.icon && (
               <span className="field-error">
                 {categoryForm.formState.errors.icon.message}
@@ -486,6 +551,7 @@ export function CatalogPage() {
               id="category-sortOrder"
               {...categoryForm.register("sortOrder")}
               type="number"
+              step="1"
               placeholder="Sort order"
             />
             {categoryForm.formState.errors.sortOrder && (
@@ -496,6 +562,7 @@ export function CatalogPage() {
           </label>
           <button
             className="primary-button"
+            type="submit"
             disabled={createCategory.isPending}
           >
             <Tags size={17} /> Create category
@@ -552,9 +619,15 @@ function ImageAttachForm({
       </label>
       <label htmlFor="image-url">
         Image URL
-        <input id="image-url" {...form.register("url")} placeholder="Image URL" />
+        <input
+          id="image-url"
+          {...form.register("url")}
+          placeholder="Image URL"
+        />
         {form.formState.errors.url && (
-          <span className="field-error">{form.formState.errors.url.message}</span>
+          <span className="field-error">
+            {form.formState.errors.url.message}
+          </span>
         )}
       </label>
       <button className="ghost-button" type="submit" disabled={isPending}>

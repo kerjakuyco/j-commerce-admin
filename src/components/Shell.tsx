@@ -101,10 +101,7 @@ export function Shell() {
             <span className="eyebrow">live control plane</span>
             <h1>Run storefront operations with clarity.</h1>
           </div>
-          <div className="api-status">
-            <span />
-            {API_BASE_URL}
-          </div>
+          <div className="api-status">API target: {API_BASE_URL}</div>
         </header>
         <Outlet />
       </main>
