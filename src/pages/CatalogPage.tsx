@@ -11,7 +11,7 @@ import { LoadingState } from "../components/LoadingState";
 import { Panel } from "../components/Panel";
 import { useToken } from "../context/AuthContext";
 import { request } from "../lib/api";
-import { assetUrlMessage, isAssetUrl } from "../lib/asset-url";
+import { assetUrlMessage, isAssetUrl, normalizeAssetUrl } from "../lib/asset-url";
 import { money, readError, slugify } from "../lib/format";
 import type {
   Category,
@@ -142,7 +142,7 @@ export function CatalogPage() {
           basePrice: values.basePrice,
           discountPrice: values.discountPrice,
           images: values.imageUrl
-            ? [{ url: values.imageUrl, sortOrder: 0 }]
+            ? [{ url: normalizeAssetUrl(values.imageUrl), sortOrder: 0 }]
             : [],
         }),
       }),
@@ -212,7 +212,7 @@ export function CatalogPage() {
       request<ProductImage>(`/products/${productId}/images`, {
         token,
         method: "POST",
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url: normalizeAssetUrl(url) }),
       }),
     onSuccess: async () => {
       await invalidateCatalog();

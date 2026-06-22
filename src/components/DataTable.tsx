@@ -48,7 +48,9 @@ export function DataTable({
                 {row.map((cell, cellIndex) => (
                   <td key={cellIndex}>
                     {typeof cell === "string" || typeof cell === "number" ? (
-                      <span className="table-cell-text">{cell}</span>
+                      <span className="table-cell-text" title={String(cell)}>
+                        {cell}
+                      </span>
                     ) : (
                       cell
                     )}

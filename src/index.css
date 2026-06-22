@@ -58,12 +58,12 @@ body {
   background:
     radial-gradient(
       circle at 8% 0%,
-      oklch(94.5% 0.05 262 / 0.72),
+      oklch(94.5% 0.05 262 / 0.46),
       transparent 34%
     ),
     radial-gradient(
       circle at 92% 4%,
-      oklch(96% 0.05 185 / 0.58),
+      oklch(96% 0.05 185 / 0.34),
       transparent 30%
     ),
     var(--bg);
@@ -177,10 +177,10 @@ code {
 
 .login-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.08fr) 420px;
+  grid-template-columns: minmax(0, 1fr) 410px;
   width: min(1080px, 100%);
   border: 1px solid var(--line);
-  border-radius: 28px;
+  border-radius: 24px;
   box-shadow: var(--shadow);
   background: var(--surface);
   overflow: hidden;
@@ -234,9 +234,9 @@ code {
   font-family: var(--display);
   margin: 14px 0;
   max-width: 620px;
-  font-size: clamp(42px, 6vw, 78px);
-  line-height: 0.98;
-  letter-spacing: -0.055em;
+  font-size: clamp(34px, 5vw, 58px);
+  line-height: 1;
+  letter-spacing: -0.05em;
 }
 
 .login-poster p {
@@ -266,8 +266,7 @@ code {
   height: 100vh;
   padding: 18px;
   border-inline-end: 1px solid var(--line);
-  background: oklch(99.2% 0.004 260 / 0.96);
-  backdrop-filter: blur(16px);
+  background: var(--surface);
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -408,9 +407,37 @@ code {
   gap: 8px;
 }
 
+.language-toggle {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  border-radius: 999px;
+  padding: 3px;
+}
+
+.language-toggle button {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+}
+
+.language-toggle button.active {
+  background: var(--surface);
+  color: var(--primary);
+  box-shadow: 0 1px 2px oklch(32% 0.08 260 / 0.08);
+}
+
 .workspace {
   min-width: 0;
-  padding: 24px;
+  padding: 22px 24px 28px;
   display: grid;
   gap: 20px;
 }
@@ -418,18 +445,18 @@ code {
 .topbar {
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
+  align-items: center;
   gap: 20px;
-  padding: 4px 2px 2px;
+  padding: 2px 2px 4px;
 }
 
 .topbar h1 {
   font-family: var(--display);
   margin: 4px 0 0;
   max-width: 780px;
-  font-size: clamp(30px, 4.5vw, 54px);
-  line-height: 1.02;
-  letter-spacing: -0.052em;
+  font-size: clamp(26px, 3.5vw, 40px);
+  line-height: 1.04;
+  letter-spacing: -0.045em;
 }
 
 .eyebrow {
@@ -448,7 +475,7 @@ code {
   gap: 8px;
   border: 1px solid var(--line);
   background: var(--surface);
-  padding: 9px 12px;
+  padding: 8px 11px;
   border-radius: 999px;
   color: var(--muted);
   max-width: 45vw;
@@ -482,7 +509,7 @@ code {
 }
 
 .panel {
-  padding: 18px;
+  padding: 16px;
   overflow: hidden;
 }
 
@@ -504,13 +531,13 @@ code {
 
 .hero-panel {
   grid-column: span 2;
-  min-height: 244px;
+  min-height: 190px;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
   background:
-    radial-gradient(circle at 84% 18%, oklch(91% 0.07 185 / 0.58), transparent 34%),
-    linear-gradient(135deg, var(--primary-soft), oklch(98% 0.012 250)),
+    radial-gradient(circle at 88% 10%, oklch(92% 0.058 185 / 0.5), transparent 30%),
+    linear-gradient(135deg, oklch(96.5% 0.024 262), oklch(99% 0.005 250)),
     var(--surface);
 }
 
@@ -518,6 +545,25 @@ code {
   color: var(--muted);
   max-width: 680px;
   font-size: 15px;
+}
+
+.operation-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 0;
+  list-style: none;
+}
+
+.operation-strip li {
+  border: 1px solid oklch(54.6% 0.215 262 / 0.16);
+  background: oklch(99% 0.006 260 / 0.78);
+  color: var(--primary);
+  border-radius: 999px;
+  padding: 6px 9px;
+  font-size: 12px;
+  font-weight: 750;
 }
 
 .span-2 {
@@ -533,12 +579,10 @@ code {
 
 .stat-card {
   padding: 18px;
-  min-height: 124px;
+  min-height: 112px;
   display: grid;
   align-content: space-between;
-  transition:
-    transform 160ms ease,
-    box-shadow 160ms ease;
+  transition: box-shadow 160ms ease;
 }
 
 .stat-card:hover {
@@ -547,13 +591,15 @@ code {
 
 .stat-card strong {
   font-family: var(--display);
-  font-size: clamp(26px, 3vw, 38px);
+  font-size: clamp(24px, 2.5vw, 34px);
   line-height: 1;
   letter-spacing: -0.05em;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
 }
 
 .chart-box {
-  height: 300px;
+  height: 280px;
 }
 
 .table-frame {
@@ -561,6 +607,7 @@ code {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
+  background: var(--surface);
 }
 
 .table-frame:focus-visible {
@@ -578,7 +625,7 @@ table {
 th,
 td {
   text-align: left;
-  padding: 13px 12px;
+  padding: 12px;
   border-bottom: 1px solid var(--line);
   vertical-align: middle;
 }
@@ -589,6 +636,7 @@ td {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 tbody tr:hover {
@@ -681,7 +729,7 @@ th {
   color: var(--primary-ink);
   background: var(--primary);
   border-color: var(--primary);
-  box-shadow: 0 8px 20px oklch(54.6% 0.215 262 / 0.2);
+  box-shadow: 0 8px 18px oklch(54.6% 0.215 262 / 0.18);
 }
 
 .primary-button:hover {
@@ -724,26 +772,31 @@ th {
 .badge-good {
   color: oklch(40% 0.15 148);
   background: var(--green-soft);
+  border-color: oklch(62% 0.17 148 / 0.18);
 }
 
 .badge-warn {
   color: oklch(45% 0.15 76);
   background: var(--yellow-soft);
+  border-color: oklch(78% 0.16 76 / 0.22);
 }
 
 .badge-danger {
   color: oklch(45% 0.2 22);
   background: var(--red-soft);
+  border-color: oklch(58% 0.22 22 / 0.18);
 }
 
 .badge-neutral {
   color: var(--muted);
   background: var(--surface-3);
+  border-color: var(--line);
 }
 
 .badge-hot {
   color: var(--primary);
   background: var(--primary-soft);
+  border-color: oklch(54.6% 0.215 262 / 0.16);
 }
 
 .stack-list,
@@ -761,6 +814,11 @@ th {
   display: grid;
   gap: 5px;
   background: var(--surface);
+}
+
+.copy-block {
+  max-width: 68ch;
+  margin: 0;
 }
 
 .asset-list article {
@@ -821,6 +879,11 @@ th {
   box-shadow: var(--shadow-soft);
 }
 
+.error-state {
+  color: oklch(45% 0.2 22);
+  background: var(--red-soft);
+}
+
 .loading-state span {
   width: 34px;
   height: 34px;
@@ -854,6 +917,10 @@ th {
 
   .nav-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .topbar h1 {
+    max-width: 100%;
   }
 
   .hero-panel,

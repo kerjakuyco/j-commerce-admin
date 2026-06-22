@@ -4,6 +4,8 @@ import { Navigate } from "react-router-dom";
 import { toast } from "sonner";
 import { z } from "zod";
 import { useAuth } from "../context/AuthContext";
+import { useI18n } from "../context/I18nContext";
+import { LanguageToggle } from "../components/LanguageToggle";
 import { API_BASE_URL, login } from "../lib/api";
 import { readError } from "../lib/format";
 
@@ -20,6 +22,7 @@ type LoginForm = z.output<typeof loginSchema>;
 
 export function LoginPage() {
   const { session, setSession } = useAuth();
+  const { t } = useI18n();
   const form = useForm<LoginFormInput, unknown, LoginForm>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
@@ -30,11 +33,11 @@ export function LoginPage() {
   async function submit(values: LoginForm) {
     try {
       const nextSession = await login(values.email, values.password);
-      if (!nextSession) throw new Error("Login failed");
+      if (!nextSession) throw new Error(t.login.loginFailed);
       if (nextSession.user.role !== "ADMIN")
-        throw new Error("Akun ini bukan admin");
+        throw new Error(t.login.adminOnly);
       setSession(nextSession);
-      toast.success(`Welcome back, ${nextSession.user.name}`);
+      toast.success(t.login.welcome(nextSession.user.name));
     } catch (error) {
       toast.error(readError(error));
     }
@@ -44,21 +47,19 @@ export function LoginPage() {
     <main className="login-scene">
       <section className="login-layout">
         <div className="login-poster">
-          <span className="eyebrow">single-store admin</span>
-          <h1>Manage orders, catalog, and campaigns in one focused console.</h1>
-          <p>
-            A calm operations workspace for fulfillment, promos, banners,
-            uploads, and revenue telemetry, tuned for fast decisions.
-          </p>
+          <span className="eyebrow">{t.login.eyebrow}</span>
+          <h1>{t.login.title}</h1>
+          <p>{t.login.body}</p>
           <div className="poster-lines" aria-hidden="true" />
         </div>
         <form className="login-card" onSubmit={form.handleSubmit(submit)}>
+          <LanguageToggle />
           <div>
-            <span className="eyebrow">api target</span>
+            <span className="eyebrow">{t.login.apiTarget}</span>
             <code>{API_BASE_URL}</code>
           </div>
           <label htmlFor="login-email">
-            Email
+            {t.login.email}
             <input
               id="login-email"
               type="email"
@@ -73,7 +74,7 @@ export function LoginPage() {
             )}
           </label>
           <label htmlFor="login-password">
-            Password
+            {t.login.password}
             <input
               id="login-password"
               type="password"
@@ -91,7 +92,7 @@ export function LoginPage() {
             type="submit"
             disabled={form.formState.isSubmitting}
           >
-            {form.formState.isSubmitting ? "Signing in..." : "Sign in"}
+            {form.formState.isSubmitting ? t.login.signingIn : t.login.signIn}
           </button>
         </form>
       </section>

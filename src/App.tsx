@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { LoadingState } from './components/LoadingState'
 import { Shell } from './components/Shell'
 import { useAuth } from './context/AuthContext'
+import { useI18n } from './context/I18nContext'
 
 const LoginPage = lazy(() => import('./pages/LoginPage').then((module) => ({ default: module.LoginPage })))
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then((module) => ({ default: module.DashboardPage })))
@@ -15,8 +16,9 @@ const BannersPage = lazy(() => import('./pages/BannersPage').then((module) => ({
 const UploadPage = lazy(() => import('./pages/UploadPage').then((module) => ({ default: module.UploadPage })))
 
 function App() {
+  const { t } = useI18n()
   return (
-    <Suspense fallback={<LoadingState label="Loading admin surface..." />}>
+    <Suspense fallback={<LoadingState label={t.app.loading} />}>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route element={<ProtectedShell />}>

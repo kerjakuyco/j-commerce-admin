@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { orderTone, paymentTone } from "../components/Badge";
-import { isAssetUrl } from "./asset-url";
+import { isAssetUrl, normalizeAssetUrl } from "./asset-url";
 import { money, readError, slugify, toNumber } from "./format";
 
 describe("format utilities", () => {
@@ -43,5 +43,11 @@ describe("asset URL validation", () => {
 
   it("rejects insecure non-local remote URLs", () => {
     expect(isAssetUrl("http://example.com/banner.webp")).toBe(false);
+  });
+
+  it("normalizes upload paths to the API origin", () => {
+    expect(normalizeAssetUrl("/uploads/banner.webp")).toBe(
+      "http://localhost:3000/uploads/banner.webp",
+    );
   });
 });

@@ -55,6 +55,12 @@ export function OrdersPage() {
   if (ordersQuery.error)
     return <ErrorState message={readError(ordersQuery.error)} />;
 
+  const canMoveOrder = (order: Order, status: OrderStatus) => {
+    if (status === order.status) return true;
+    if (status === "PAID" && order.paymentStatus !== "PAID") return false;
+    return allowedStatusTransitions[order.status].includes(status);
+  };
+
   return (
     <Panel title="Order management" eyebrow="fulfillment">
       <DataTable
@@ -113,8 +119,7 @@ export function OrdersPage() {
                 <option
                   key={status}
                   disabled={
-                    status !== order.status &&
-                    !allowedStatusTransitions[order.status].includes(status)
+                    !canMoveOrder(order, status)
                   }
                 >
                   {status}

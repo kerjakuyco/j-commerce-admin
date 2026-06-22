@@ -12,27 +12,25 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
+import { LanguageToggle } from "./LanguageToggle";
 import { API_BASE_URL, request } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
+import { useI18n } from "../context/I18nContext";
 
 const nav = [
-  { to: "/", label: "Dashboard", kicker: "overview", icon: Gauge },
-  { to: "/orders", label: "Orders", kicker: "fulfillment", icon: PackageCheck },
-  { to: "/catalog", label: "Catalog", kicker: "products", icon: Boxes },
-  { to: "/users", label: "Users", kicker: "access", icon: Users },
-  { to: "/vouchers", label: "Vouchers", kicker: "promo", icon: BadgePercent },
-  {
-    to: "/notifications",
-    label: "Messages",
-    kicker: "broadcast",
-    icon: BellRing,
-  },
-  { to: "/banners", label: "Banners", kicker: "home", icon: RadioTower },
-  { to: "/upload", label: "Upload", kicker: "assets", icon: ImagePlus },
-];
+  { to: "/", key: "dashboard", icon: Gauge },
+  { to: "/orders", key: "orders", icon: PackageCheck },
+  { to: "/catalog", key: "catalog", icon: Boxes },
+  { to: "/users", key: "users", icon: Users },
+  { to: "/vouchers", key: "vouchers", icon: BadgePercent },
+  { to: "/notifications", key: "messages", icon: BellRing },
+  { to: "/banners", key: "banners", icon: RadioTower },
+  { to: "/upload", key: "upload", icon: ImagePlus },
+] as const;
 
 export function Shell() {
   const { session, logout } = useAuth();
+  const { t } = useI18n();
   const queryClient = useQueryClient();
   const [loggingOut, setLoggingOut] = useState(false);
 
@@ -59,7 +57,7 @@ export function Shell() {
           <div className="brand-sigil">J</div>
           <div>
             <strong>j-commerce</strong>
-            <span>admin console</span>
+            <span>{t.shell.adminConsole}</span>
           </div>
         </div>
         <nav className="nav-list">
@@ -74,34 +72,37 @@ export function Shell() {
               >
                 <Icon size={18} />
                 <span>
-                  <small>{item.kicker}</small>
-                  {item.label}
+                  <small>{t.nav[item.key].kicker}</small>
+                  {t.nav[item.key].label}
                 </span>
               </NavLink>
             );
           })}
         </nav>
         <div className="operator-card">
-          <span className="eyebrow">operator</span>
+          <span className="eyebrow">{t.shell.operator}</span>
           <strong>{session?.user.name}</strong>
           <small>{session?.user.email}</small>
+          <LanguageToggle />
           <button
             type="button"
             className="ghost-button"
             onClick={handleLogout}
             disabled={loggingOut}
           >
-            <LogOut size={16} /> {loggingOut ? "Signing out..." : "Logout"}
+            <LogOut size={16} /> {loggingOut ? t.shell.signingOut : t.shell.logout}
           </button>
         </div>
       </aside>
       <main className="workspace">
         <header className="topbar">
           <div>
-            <span className="eyebrow">live control plane</span>
-            <h1>Run storefront operations with clarity.</h1>
+            <span className="eyebrow">{t.shell.controlPlane}</span>
+            <h1>{t.shell.operationsConsole}</h1>
           </div>
-          <div className="api-status">API target: {API_BASE_URL}</div>
+          <div className="api-status" title={API_BASE_URL}>
+            <span aria-hidden="true" /> {t.shell.apiTarget}: {API_BASE_URL}
+          </div>
         </header>
         <Outlet />
       </main>

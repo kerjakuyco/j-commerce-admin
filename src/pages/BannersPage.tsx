@@ -10,7 +10,7 @@ import { LoadingState } from "../components/LoadingState";
 import { Panel } from "../components/Panel";
 import { useToken } from "../context/AuthContext";
 import { request } from "../lib/api";
-import { assetUrlMessage, isAssetUrl } from "../lib/asset-url";
+import { assetUrlMessage, isAssetUrl, normalizeAssetUrl } from "../lib/asset-url";
 import { readError } from "../lib/format";
 import type { Banner } from "../types";
 
@@ -46,7 +46,11 @@ export function BannersPage() {
       request<Banner>("/banners", {
         token,
         method: "POST",
-        body: JSON.stringify({ ...values, link: values.link || undefined }),
+        body: JSON.stringify({
+          ...values,
+          image: normalizeAssetUrl(values.image),
+          link: values.link || undefined,
+        }),
       }),
     onSuccess: async () => {
       form.reset({ title: "", image: "", link: "", sortOrder: 0 });
@@ -90,7 +94,7 @@ export function BannersPage() {
             <article className="banner-card" key={banner.id}>
               {isAssetUrl(banner.image) && (
                 <img
-                  src={banner.image}
+                  src={normalizeAssetUrl(banner.image)}
                   alt={banner.title}
                   width="320"
                   height="180"
