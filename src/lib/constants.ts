@@ -29,4 +29,4 @@ export const allowedStatusTransitions: Record<OrderStatus, OrderStatus[]> = {
 };
 
 export const voucherTypes: VoucherType[] = ["FIXED", "PERCENTAGE"];
-export const notificationTypes: NotificationType[] = ["PROMO", "SYSTEM"];
+export const notificationTypes: NotificationType[] = ["PROMO", "ORDER", "SYSTEM"];

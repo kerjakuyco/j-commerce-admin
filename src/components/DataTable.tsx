@@ -15,7 +15,7 @@ export function DataTable({
 }) {
   return (
     <div
-      className="table-frame"
+      className={`table-frame${rows.length === 0 ? " table-frame-empty" : ""}`}
       role="region"
       aria-label={caption}
       tabIndex={0}
@@ -39,7 +39,7 @@ export function DataTable({
           {rows.length === 0 ? (
             <tr>
               <td colSpan={columns.length} className="table-empty">
-                {empty}
+                <div className="table-empty-state">{empty}</div>
               </td>
             </tr>
           ) : (

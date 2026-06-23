@@ -33,14 +33,17 @@ Status: implemented admin console for `j-commerce-api`.
 
 ## Catalog
 
-- Product table with brand, category, price, rating, variant count, and delete action.
+- Product table with brand, category, price, rating, variant count, edit, and delete actions.
 - Create product form with optional image bootstrap.
+- Edit product form for product details, pricing, category, merchandising, and optional image attach.
+- Create and update merchandising flags for Produk Pilihan and Flash Sale rails, including flash sale end time.
 - Create category form.
 - Add variant form.
 - Attach image to an existing product.
 - API endpoints used:
   - `GET /products?limit=80`
   - `POST /products`
+  - `PATCH /products/:id`
   - `DELETE /products/:id`
   - `GET /categories`
   - `POST /categories`
@@ -57,11 +60,14 @@ Status: implemented admin console for `j-commerce-api`.
 ## Vouchers
 
 - Voucher table backed by the admin list endpoint, including inactive, expired, and exhausted records.
-- Create voucher form with type, value, quota, validity, minimum purchase, and maximum discount.
+- Create and edit voucher form with type, value, quota, validity window, active state, minimum purchase, and maximum discount.
+- Disable and enable voucher actions from the table.
 - API endpoints used:
   - `GET /vouchers/admin/all?limit=100`
   - fallback: `GET /vouchers?limit=100`
   - `POST /vouchers`
+  - `PATCH /vouchers/:id`
+  - `DELETE /vouchers/:id`
 
 ## Notifications
 
@@ -72,7 +78,7 @@ Status: implemented admin console for `j-commerce-api`.
 ## Banners
 
 - Banner wall with active/inactive image previews.
-- Create banner form.
+- Create and edit banner form for title, image, link, sort order, and active state.
 - Deactivate/delete banner action.
 - API endpoints used:
   - `GET /banners/admin/all`

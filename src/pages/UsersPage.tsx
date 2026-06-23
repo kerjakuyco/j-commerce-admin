@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Search } from "lucide-react";
+import { Power, PowerOff, Search, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "../components/Badge";
@@ -87,8 +87,13 @@ export function UsersPage() {
             </Badge>,
             <button
               key={user.id}
-              className="table-button"
+              className={`icon-button${user.isActive && !protectedUser ? " icon-button-danger" : ""}`}
               type="button"
+              aria-label={
+                protectedUser
+                  ? `${user.email} is protected`
+                  : `${user.isActive ? "Disable" : "Enable"} ${user.email}`
+              }
               disabled={protectedUser || toggleMutation.isPending}
               onClick={() => {
                 // The backend enforces self-disable and protected-admin
@@ -102,13 +107,21 @@ export function UsersPage() {
                 }
                 toggleMutation.mutate(user);
               }}
-              title={protectedUser ? "Admin accounts are protected" : undefined}
+              title={
+                protectedUser
+                  ? "Protected"
+                  : user.isActive
+                    ? "Disable"
+                    : "Enable"
+              }
             >
-              {protectedUser
-                ? "Protected"
-                : user.isActive
-                  ? "Disable"
-                  : "Enable"}
+              {protectedUser ? (
+                <ShieldCheck size={16} aria-hidden="true" />
+              ) : user.isActive ? (
+                <PowerOff size={16} aria-hidden="true" />
+              ) : (
+                <Power size={16} aria-hidden="true" />
+              )}
             </button>,
           ];
         })}

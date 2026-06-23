@@ -12,7 +12,7 @@ import { readError } from "../lib/format";
 import type { NotificationType } from "../types";
 
 const notificationSchema = z.object({
-  type: z.enum(["PROMO", "SYSTEM"]),
+  type: z.enum(["PROMO", "ORDER", "SYSTEM"]),
   title: z.string().min(3).max(120),
   body: z.string().min(8).max(1000),
 });
@@ -90,14 +90,16 @@ export function NotificationsPage() {
               </span>
             )}
           </label>
-          <button
-            className="primary-button"
-            type="submit"
-            disabled={mutation.isPending}
-          >
-            <Radio size={17} />{" "}
-            {mutation.isPending ? "Sending…" : "Send broadcast"}
-          </button>
+          <div className="form-actions">
+            <button
+              className="primary-button"
+              type="submit"
+              disabled={mutation.isPending}
+            >
+              <Radio size={17} />
+              {mutation.isPending ? "Sending…" : "Send broadcast"}
+            </button>
+          </div>
         </form>
       </Panel>
       <Panel title="Delivery guidance" eyebrow="operator notes">

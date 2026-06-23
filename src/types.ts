@@ -72,6 +72,7 @@ export interface Product {
   totalSold: number
   isFeatured: boolean
   isFlashSale: boolean
+  flashSaleEndsAt?: string | null
   isActive: boolean
   category?: Category
   images?: ProductImage[]
@@ -94,6 +95,8 @@ export interface Address {
 
 export interface OrderItem {
   id: string
+  productId?: string
+  variantId?: string
   productName: string
   productImage?: string | null
   variantName: string
@@ -114,10 +117,26 @@ export interface Order {
   discount: string | number
   total: string | number
   trackingNumber?: string | null
+  cancelReason?: string | null
   createdAt: string
+  updatedAt?: string
+  paidAt?: string | null
+  shippedAt?: string | null
+  deliveredAt?: string | null
+  cancelledAt?: string | null
   user?: Pick<User, 'id' | 'name' | 'email' | 'phone'>
   address?: Address
   items?: OrderItem[]
+  voucher?: Pick<Voucher, 'id' | 'code' | 'type' | 'value'> | null
+  payment?: {
+    id: string
+    provider?: string | null
+    method?: string | null
+    status: PaymentStatus
+    amount: string | number
+    paidAt?: string | null
+    expiredAt?: string | null
+  } | null
   _count?: { items: number }
 }
 
@@ -154,11 +173,22 @@ export interface UploadedFile {
 
 export interface DashboardStats {
   totalRevenue: number
+  revenueGrowthPercent?: number
   totalOrders: number
   orderGrowthPercent: number
   totalCustomers: number
   totalProducts: number
   recentOrders: Order[]
+}
+
+export type DashboardAlertTone = 'neutral' | 'good' | 'warn' | 'danger' | 'hot'
+
+export interface DashboardAlert {
+  id: string
+  label: string
+  count: number
+  tone: DashboardAlertTone
+  href: string
 }
 
 export interface RevenuePoint {
