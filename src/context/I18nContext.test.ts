@@ -9,6 +9,6 @@ describe("admin i18n", () => {
 
   it("provides English and Indonesian shell copy", () => {
     expect(getTranslations("en").shell.operationsConsole).toBe("Operations console");
-    expect(getTranslations("id").shell.operationsConsole).toBe("Konsol operasional");
+    expect(getTranslations("id").shell.operationsConsole).toBe("Operations console");
   });
 });

@@ -2,38 +2,66 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Power, PowerOff, TicketPlus } from "lucide-react";
 import { useState } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { DataTable } from "../components/DataTable";
 import { ErrorState } from "../components/ErrorState";
 import { LoadingState } from "../components/LoadingState";
+import { NumberInput } from "../components/NumberInput";
 import { Panel } from "../components/Panel";
 import { useToken } from "../context/AuthContext";
+import { useI18n, type Language } from "../context/I18nContext";
 import { ApiError, request } from "../lib/api";
 import { voucherTypes } from "../lib/constants";
-import { money, readError, shortDate, toNumber } from "../lib/format";
+import {
+  money,
+  parseWholeNumberInput,
+  readError,
+  readFormError,
+  shortDate,
+  toNumber,
+} from "../lib/format";
 import type { Paginated, Voucher, VoucherType } from "../types";
+
+const emptyNumberToUndefined = (value: unknown) => {
+  if (typeof value !== "string") return value;
+  const normalized = parseWholeNumberInput(value);
+  return normalized === "" ? undefined : normalized;
+};
+
+const emptyNumberToNull = (value: unknown) => {
+  if (typeof value !== "string") return value;
+  const normalized = parseWholeNumberInput(value);
+  return normalized === "" ? null : normalized;
+};
 
 const voucherSchema = z
   .object({
-    code: z.string().trim().min(3),
+    code: z.string().trim().min(3, "Enter at least 3 characters"),
     type: z.enum(["FIXED", "PERCENTAGE"]),
     value: z.preprocess(
-      (value) => (value === "" ? undefined : value),
-      z.coerce.number().min(0),
+      emptyNumberToUndefined,
+      z.coerce.number().min(0, "Enter 0 or a positive number"),
     ),
     minPurchase: z.preprocess(
-      (value) => (value === "" ? undefined : value),
-      z.coerce.number().min(0),
+      emptyNumberToUndefined,
+      z.coerce.number().min(0, "Enter 0 or a positive number"),
     ),
     maxDiscount: z.preprocess(
-      (value) => (value === "" ? null : value),
-      z.coerce.number().min(0).nullable().optional(),
+      emptyNumberToNull,
+      z.coerce
+        .number()
+        .min(0, "Enter 0 or a positive number")
+        .nullable()
+        .optional(),
     ),
-    quota: z.coerce.number().int().min(1),
+    quota: z.preprocess(
+      emptyNumberToUndefined,
+      z.coerce.number().int("Enter a whole number").min(1, "Enter at least 1"),
+    ),
     startsAt: z.string().optional(),
-    expiresAt: z.string().min(1),
+    expiresAt: z.string().min(1, "Choose an expiry date"),
     isActive: z.boolean(),
   })
   // A PERCENTAGE voucher value above 100 would discount more than the
@@ -41,11 +69,11 @@ const voucherSchema = z
   // also enforces @Max(100) for PERCENTAGE, so reject it client-side too for a
   // clear inline error instead of a 400 round-trip.
   .refine((v) => v.type !== "PERCENTAGE" || v.value <= 100, {
-    message: "Percentage value must be 0-100",
+    message: "Use a percentage from 0 to 100",
     path: ["value"],
   })
   .refine(
-    (v) => !v.startsAt || new Date(v.expiresAt) > new Date(v.startsAt),
+    (v) => !v.startsAt || !v.expiresAt || new Date(v.expiresAt) > new Date(v.startsAt),
     {
       message: "Expiry must be after the start time",
       path: ["expiresAt"],
@@ -67,8 +95,128 @@ const emptyVoucherForm: VoucherFormInput = {
   isActive: true,
 };
 
+type VoucherCopy = {
+  created: string;
+  updated: string;
+  deactivated: string;
+  statusUpdated: string;
+  listTitle: string;
+  listEyebrow: string;
+  tableCaption: string;
+  columns: string[];
+  voucherLabel: string;
+  typeLabels: Record<VoucherType, string>;
+  to: string;
+  edit: string;
+  disable: string;
+  enable: string;
+  confirmDisable: (code: string) => string;
+  formCreate: string;
+  formEdit: string;
+  formEyebrow: string;
+  code: string;
+  type: string;
+  value: string;
+  quota: string;
+  minimumPurchase: string;
+  maxDiscount: string;
+  starts: string;
+  expiry: string;
+  storedUtc: string;
+  active: string;
+  inactive: string;
+  activeHelp: string;
+  scheduled: string;
+  expired: string;
+  exhausted: string;
+  update: string;
+  create: string;
+  cancel: string;
+};
+
+const copy: Record<Language, VoucherCopy> = {
+  en: {
+    created: "Voucher created",
+    updated: "Voucher updated",
+    deactivated: "Voucher deactivated",
+    statusUpdated: "Voucher status updated",
+    listTitle: "Vouchers",
+    listEyebrow: "promo rules",
+    tableCaption: "Voucher rules table",
+    columns: ["Code", "Type", "Value", "Quota", "Minimum", "Validity", "Status", "Action"],
+    voucherLabel: "voucher",
+    typeLabels: { FIXED: "Fixed", PERCENTAGE: "Percentage" },
+    to: "to",
+    edit: "Edit",
+    disable: "Disable",
+    enable: "Enable",
+    confirmDisable: (code: string) => `Disable voucher ${code}?`,
+    formCreate: "Create voucher",
+    formEdit: "Edit voucher",
+    formEyebrow: "controlled discount",
+    code: "Code",
+    type: "Type",
+    value: "Value",
+    quota: "Quota",
+    minimumPurchase: "Minimum purchase",
+    maxDiscount: "Max discount",
+    starts: "Starts",
+    expiry: "Expiry",
+    storedUtc: "Stored as UTC",
+    active: "Active",
+    inactive: "Inactive",
+    activeHelp: "Inactive vouchers are hidden from customer voucher lists.",
+    scheduled: "Scheduled",
+    expired: "Expired",
+    exhausted: "Exhausted",
+    update: "Update voucher",
+    create: "Create voucher",
+    cancel: "Cancel edit",
+  },
+  id: {
+    created: "Voucher dibuat",
+    updated: "Voucher diperbarui",
+    deactivated: "Voucher dinonaktifkan",
+    statusUpdated: "Status voucher diperbarui",
+    listTitle: "Voucher",
+    listEyebrow: "aturan promo",
+    tableCaption: "Tabel aturan voucher",
+    columns: ["Kode", "Tipe", "Nilai", "Kuota", "Minimum", "Periode", "Status", "Aksi"],
+    voucherLabel: "voucher",
+    typeLabels: { FIXED: "Fixed", PERCENTAGE: "Percentage" },
+    to: "sampai",
+    edit: "Edit",
+    disable: "Nonaktifkan",
+    enable: "Aktifkan",
+    confirmDisable: (code: string) => `Nonaktifkan voucher ${code}?`,
+    formCreate: "Buat voucher",
+    formEdit: "Edit voucher",
+    formEyebrow: "diskon terkontrol",
+    code: "Kode",
+    type: "Tipe",
+    value: "Nilai",
+    quota: "Kuota",
+    minimumPurchase: "Minimum pembelian",
+    maxDiscount: "Maksimum diskon",
+    starts: "Mulai",
+    expiry: "Berakhir",
+    storedUtc: "Disimpan sebagai UTC",
+    active: "Active",
+    inactive: "Inactive",
+    activeHelp: "Voucher nonaktif disembunyikan dari daftar voucher pelanggan.",
+    scheduled: "Scheduled",
+    expired: "Expired",
+    exhausted: "Exhausted",
+    update: "Perbarui voucher",
+    create: "Buat voucher",
+    cancel: "Batal edit",
+  },
+};
+
 export function VouchersPage() {
   const token = useToken();
+  const { language } = useI18n();
+  const c = copy[language];
   const queryClient = useQueryClient();
   const [editingVoucher, setEditingVoucher] = useState<Voucher | null>(null);
   const vouchersQuery = useQuery({
@@ -103,9 +251,9 @@ export function VouchersPage() {
       setEditingVoucher(null);
       form.reset(emptyVoucherForm);
       await queryClient.invalidateQueries({ queryKey: ["vouchers"] });
-      toast.success("Voucher created");
+      toast.success(c.created);
     },
-    onError: (error) => toast.error(readError(error)),
+    onError: (error) => toast.error(readError(error, language)),
   });
   const updateVoucher = useMutation({
     mutationFn: ({ id, values }: { id: string; values: VoucherForm }) =>
@@ -118,9 +266,9 @@ export function VouchersPage() {
       setEditingVoucher(null);
       form.reset(emptyVoucherForm);
       await queryClient.invalidateQueries({ queryKey: ["vouchers"] });
-      toast.success("Voucher updated");
+      toast.success(c.updated);
     },
-    onError: (error) => toast.error(readError(error)),
+    onError: (error) => toast.error(readError(error, language)),
   });
   const deactivateVoucher = useMutation({
     mutationFn: (id: string) =>
@@ -130,9 +278,9 @@ export function VouchersPage() {
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["vouchers"] });
-      toast.success("Voucher deactivated");
+      toast.success(c.deactivated);
     },
-    onError: (error) => toast.error(readError(error)),
+    onError: (error) => toast.error(readError(error, language)),
   });
   const toggleVoucher = useMutation({
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
@@ -143,14 +291,14 @@ export function VouchersPage() {
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["vouchers"] });
-      toast.success("Voucher status updated");
+      toast.success(c.statusUpdated);
     },
-    onError: (error) => toast.error(readError(error)),
+    onError: (error) => toast.error(readError(error, language)),
   });
 
   if (vouchersQuery.isLoading) return <LoadingState />;
   if (vouchersQuery.error)
-    return <ErrorState message={readError(vouchersQuery.error)} />;
+    return <ErrorState message={readError(vouchersQuery.error, language)} />;
 
   const vouchers = vouchersQuery.data?.data ?? [];
   const statusNow = vouchersQuery.dataUpdatedAt;
@@ -171,35 +319,26 @@ export function VouchersPage() {
 
   return (
     <div className="split-layout">
-      <Panel title="Vouchers" eyebrow="promo rules">
+      <Panel title={c.listTitle} eyebrow={c.listEyebrow}>
         <DataTable
-          caption="Voucher rules table"
-          columns={[
-            "Code",
-            "Type",
-            "Value",
-            "Quota",
-            "Minimum",
-            "Validity",
-            "Status",
-            "Action",
-          ]}
+          caption={c.tableCaption}
+          columns={c.columns}
           rows={vouchers.map((voucher) => [
             voucher.code,
-            voucher.type,
+            c.typeLabels[voucher.type],
             voucher.type === "PERCENTAGE"
               ? `${toNumber(voucher.value)}%`
               : money(voucher.value),
             `${voucher.usedCount}/${voucher.quota}`,
             money(voucher.minPurchase),
-            `${shortDate(voucher.startsAt)} to ${shortDate(voucher.expiresAt)}`,
-            <VoucherStatusBadge voucher={voucher} now={statusNow} />,
+            `${shortDate(voucher.startsAt, language)} ${c.to} ${shortDate(voucher.expiresAt, language)}`,
+            <VoucherStatusBadge voucher={voucher} now={statusNow} copy={c} />,
             <div className="table-actions">
               <button
                 className="icon-button"
                 type="button"
-                aria-label={`Edit voucher ${voucher.code}`}
-                title="Edit"
+                aria-label={`${c.edit} ${c.voucherLabel} ${voucher.code}`}
+                title={c.edit}
                 onClick={() => startEditingVoucher(voucher)}
               >
                 <Pencil size={16} aria-hidden="true" />
@@ -207,12 +346,12 @@ export function VouchersPage() {
               <button
                 className={`icon-button${voucher.isActive ? " icon-button-danger" : ""}`}
                 type="button"
-                aria-label={`${voucher.isActive ? "Disable" : "Enable"} voucher ${voucher.code}`}
-                title={voucher.isActive ? "Disable" : "Enable"}
+                aria-label={`${voucher.isActive ? c.disable : c.enable} ${c.voucherLabel} ${voucher.code}`}
+                title={voucher.isActive ? c.disable : c.enable}
                 disabled={deactivateVoucher.isPending || toggleVoucher.isPending}
                 onClick={() => {
                   if (voucher.isActive) {
-                    if (window.confirm(`Disable voucher ${voucher.code}?`)) {
+                    if (window.confirm(c.confirmDisable(voucher.code))) {
                       deactivateVoucher.mutate(voucher.id);
                     }
                   } else {
@@ -231,8 +370,8 @@ export function VouchersPage() {
         />
       </Panel>
       <Panel
-        title={editingVoucher ? "Edit voucher" : "Create voucher"}
-        eyebrow={editingVoucher ? editingVoucher.code : "controlled discount"}
+        title={editingVoucher ? c.formEdit : c.formCreate}
+        eyebrow={editingVoucher ? editingVoucher.code : c.formEyebrow}
       >
         <form
           id="voucher-form"
@@ -244,89 +383,125 @@ export function VouchersPage() {
           )}
         >
           <label htmlFor="voucher-code">
-            Code
+            {c.code}
             <input
               id="voucher-code"
               {...form.register("code")}
-              placeholder="Code"
+              placeholder={c.code}
             />
             {form.formState.errors.code && (
               <span className="field-error">
-                {form.formState.errors.code.message}
+                {readFormError(form.formState.errors.code.message, language)}
               </span>
             )}
           </label>
           <label htmlFor="voucher-type">
-            Type
+            {c.type}
             <select id="voucher-type" {...form.register("type")}>
               {voucherTypes.map((type: VoucherType) => (
-                <option key={type}>{type}</option>
+                <option key={type} value={type}>{c.typeLabels[type]}</option>
               ))}
             </select>
             {form.formState.errors.type && (
               <span className="field-error">
-                {form.formState.errors.type.message}
+                {readFormError(form.formState.errors.type.message, language)}
               </span>
             )}
           </label>
           <label htmlFor="voucher-value">
-            Value
-            <input
-              id="voucher-value"
-              {...form.register("value")}
-              type="number"
-              placeholder="Value"
+            {c.value}
+            <Controller
+              control={form.control}
+              name="value"
+              render={({ field }) => (
+                <NumberInput
+                  id="voucher-value"
+                  name={field.name}
+                  ref={field.ref}
+                  value={field.value}
+                  onBlur={field.onBlur}
+                  onValueChange={field.onChange}
+                  placeholder={c.value}
+                />
+              )}
             />
             {form.formState.errors.value && (
               <span className="field-error">
-                {form.formState.errors.value.message}
+                {readFormError(form.formState.errors.value.message, language)}
               </span>
             )}
           </label>
           <label htmlFor="voucher-minPurchase">
-            Minimum purchase
-            <input
-              id="voucher-minPurchase"
-              {...form.register("minPurchase")}
-              type="number"
-              placeholder="Minimum purchase"
+            {c.minimumPurchase}
+            <Controller
+              control={form.control}
+              name="minPurchase"
+              render={({ field }) => (
+                <NumberInput
+                  id="voucher-minPurchase"
+                  name={field.name}
+                  ref={field.ref}
+                  value={field.value}
+                  onBlur={field.onBlur}
+                  onValueChange={field.onChange}
+                  placeholder={c.minimumPurchase}
+                />
+              )}
             />
             {form.formState.errors.minPurchase && (
               <span className="field-error">
-                {form.formState.errors.minPurchase.message}
+                {readFormError(form.formState.errors.minPurchase.message, language)}
               </span>
             )}
           </label>
           <label htmlFor="voucher-maxDiscount">
-            Max discount
-            <input
-              id="voucher-maxDiscount"
-              {...form.register("maxDiscount")}
-              type="number"
-              placeholder="Max discount"
+            {c.maxDiscount}
+            <Controller
+              control={form.control}
+              name="maxDiscount"
+              render={({ field }) => (
+                <NumberInput
+                  id="voucher-maxDiscount"
+                  name={field.name}
+                  ref={field.ref}
+                  value={field.value}
+                  onBlur={field.onBlur}
+                  onValueChange={field.onChange}
+                  placeholder={c.maxDiscount}
+                />
+              )}
             />
             {form.formState.errors.maxDiscount && (
               <span className="field-error">
-                {form.formState.errors.maxDiscount.message}
+                {readFormError(form.formState.errors.maxDiscount.message, language)}
               </span>
             )}
           </label>
           <label htmlFor="voucher-quota">
-            Quota
-            <input
-              id="voucher-quota"
-              {...form.register("quota")}
-              type="number"
-              placeholder="Quota"
+            {c.quota}
+            <Controller
+              control={form.control}
+              name="quota"
+              render={({ field }) => (
+                <NumberInput
+                  id="voucher-quota"
+                  name={field.name}
+                  ref={field.ref}
+                  value={field.value}
+                  onBlur={field.onBlur}
+                  onValueChange={field.onChange}
+                  placeholder={c.quota}
+                />
+              )}
             />
             {form.formState.errors.quota && (
               <span className="field-error">
-                {form.formState.errors.quota.message}
+                {readFormError(form.formState.errors.quota.message, language)}
               </span>
             )}
           </label>
           <label htmlFor="voucher-startsAt">
-            Starts
+            {c.starts}
             <input
               id="voucher-startsAt"
               {...form.register("startsAt")}
@@ -334,17 +509,17 @@ export function VouchersPage() {
             />
             {startsAt && (
               <span className="field-hint">
-                Stored as UTC: {new Date(startsAt).toISOString()}
+                {c.storedUtc}: {new Date(startsAt).toISOString()}
               </span>
             )}
             {form.formState.errors.startsAt && (
               <span className="field-error">
-                {form.formState.errors.startsAt.message}
+                {readFormError(form.formState.errors.startsAt.message, language)}
               </span>
             )}
           </label>
           <label htmlFor="voucher-expiresAt">
-            Expiry
+            {c.expiry}
             <input
               id="voucher-expiresAt"
               {...form.register("expiresAt")}
@@ -355,12 +530,12 @@ export function VouchersPage() {
               exact UTC instant that will be stored. */}
             {expiresAt && (
               <span className="field-hint">
-                Stored as UTC: {new Date(expiresAt).toISOString()}
+                {c.storedUtc}: {new Date(expiresAt).toISOString()}
               </span>
             )}
             {form.formState.errors.expiresAt && (
               <span className="field-error">
-                {form.formState.errors.expiresAt.message}
+                {readFormError(form.formState.errors.expiresAt.message, language)}
               </span>
             )}
           </label>
@@ -371,8 +546,8 @@ export function VouchersPage() {
               {...form.register("isActive")}
             />
             <span>
-              <strong>Active</strong>
-              <small>Inactive vouchers are hidden from customer voucher lists.</small>
+              <strong>{c.active}</strong>
+              <small>{c.activeHelp}</small>
             </span>
           </label>
           <div className="form-actions">
@@ -381,8 +556,8 @@ export function VouchersPage() {
               type="submit"
               disabled={savingVoucher}
             >
-              <TicketPlus size={17} /> {editingVoucher ? "Update" : "Create"}
-              voucher
+              <TicketPlus size={17} />
+              {editingVoucher ? c.update : c.create}
             </button>
             {editingVoucher && (
               <button
@@ -391,7 +566,7 @@ export function VouchersPage() {
                 disabled={savingVoucher}
                 onClick={cancelEditingVoucher}
               >
-                Cancel edit
+                {c.cancel}
               </button>
             )}
           </div>
@@ -435,17 +610,25 @@ function toDateTimeLocal(value: string) {
   return new Date(date.getTime() - offsetMs).toISOString().slice(0, 16);
 }
 
-function VoucherStatusBadge({ voucher, now }: { voucher: Voucher; now: number }) {
-  if (!voucher.isActive) return <span className="badge badge-neutral">Inactive</span>;
+function VoucherStatusBadge({
+  voucher,
+  now,
+  copy,
+}: {
+  voucher: Voucher;
+  now: number;
+  copy: VoucherCopy;
+}) {
+  if (!voucher.isActive) return <span className="badge badge-neutral">{copy.inactive}</span>;
   if (Date.parse(voucher.expiresAt) < now) {
-    return <span className="badge badge-danger">Expired</span>;
+    return <span className="badge badge-danger">{copy.expired}</span>;
   }
   if (Date.parse(voucher.startsAt) > now) {
-    return <span className="badge badge-warn">Scheduled</span>;
+    return <span className="badge badge-warn">{copy.scheduled}</span>;
   }
   if (voucher.usedCount >= voucher.quota) {
-    return <span className="badge badge-danger">Exhausted</span>;
+    return <span className="badge badge-danger">{copy.exhausted}</span>;
   }
 
-  return <span className="badge badge-good">Active</span>;
+  return <span className="badge badge-good">{copy.active}</span>;
 }

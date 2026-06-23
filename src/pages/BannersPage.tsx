@@ -2,17 +2,20 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ImageOff, Megaphone, Pencil, Power, Trash2 } from "lucide-react";
 import { useState } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Badge } from "../components/Badge";
 import { ErrorState } from "../components/ErrorState";
+import { ImageUploadButton } from "../components/ImageUploadButton";
 import { LoadingState } from "../components/LoadingState";
+import { NumberInput } from "../components/NumberInput";
 import { Panel } from "../components/Panel";
 import { useToken } from "../context/AuthContext";
+import { useI18n, type Language } from "../context/I18nContext";
 import { request } from "../lib/api";
 import { assetUrlMessage, isAssetUrl, normalizeAssetUrl } from "../lib/asset-url";
-import { readError } from "../lib/format";
+import { parseWholeNumberInput, readError, readFormError } from "../lib/format";
 import type { Banner } from "../types";
 
 const bannerSchema = z.object({
@@ -22,7 +25,11 @@ const bannerSchema = z.object({
   }),
   link: z.string().optional(),
   sortOrder: z.preprocess(
-    (value) => (value === "" ? undefined : value),
+    (value) => {
+      if (typeof value !== "string") return value;
+      const normalized = parseWholeNumberInput(value);
+      return normalized === "" ? undefined : normalized;
+    },
     z.coerce.number().int().min(0),
   ),
   isActive: z.boolean(),
@@ -39,8 +46,113 @@ const emptyBannerForm: BannerFormInput = {
   isActive: true,
 };
 
+type BannerCopy = {
+  created: string;
+  updated: string;
+  deactivated: string;
+  statusUpdated: string;
+  listTitle: string;
+  listEyebrow: string;
+  empty: string;
+  imageUnavailable: string;
+  active: string;
+  inactive: string;
+  noLink: string;
+  order: string;
+  edit: string;
+  editBanner: (title: string) => string;
+  deactivate: string;
+  activate: string;
+  toggleBanner: (action: string, title: string) => string;
+  confirmDeactivate: (title: string) => string;
+  formTitleCreate: string;
+  formTitleEdit: string;
+  formEyebrow: string;
+  title: string;
+  imageUrl: string;
+  link: string;
+  sortOrder: string;
+  activeHelp: string;
+  publish: string;
+  update: string;
+  cancel: string;
+  previewHint: string;
+  preview: string;
+};
+
+const copy: Record<Language, BannerCopy> = {
+  en: {
+    created: "Banner created",
+    updated: "Banner updated",
+    deactivated: "Banner deactivated",
+    statusUpdated: "Banner status updated",
+    listTitle: "Home banners",
+    listEyebrow: "visual merchandising",
+    empty: "No banners yet. Publish one to fill the home carousel.",
+    imageUnavailable: "Image unavailable",
+    active: "Active",
+    inactive: "Inactive",
+    noLink: "No link",
+    order: "Order",
+    edit: "Edit",
+    editBanner: (title: string) => `Edit banner ${title}`,
+    deactivate: "Deactivate",
+    activate: "Activate",
+    toggleBanner: (action: string, title: string) => `${action} banner ${title}`,
+    confirmDeactivate: (title: string) => `Deactivate banner ${title}?`,
+    formTitleCreate: "Create banner",
+    formTitleEdit: "Edit banner",
+    formEyebrow: "campaign surface",
+    title: "Title",
+    imageUrl: "Image URL",
+    link: "Link",
+    sortOrder: "Sort order",
+    activeHelp: "Inactive banners are hidden from the home carousel.",
+    publish: "Publish banner",
+    update: "Update banner",
+    cancel: "Cancel edit",
+    previewHint: "Preview appears after a valid asset URL.",
+    preview: "Banner preview",
+  },
+  id: {
+    created: "Banner dibuat",
+    updated: "Banner diperbarui",
+    deactivated: "Banner dinonaktifkan",
+    statusUpdated: "Status banner diperbarui",
+    listTitle: "Home Banner",
+    listEyebrow: "visual merchandising",
+    empty: "Belum ada banner. Publish satu banner untuk mengisi carousel home.",
+    imageUnavailable: "Gambar tidak tersedia",
+    active: "Active",
+    inactive: "Inactive",
+    noLink: "Tanpa link",
+    order: "Urutan",
+    edit: "Edit",
+    editBanner: (title: string) => `Edit banner ${title}`,
+    deactivate: "Nonaktifkan",
+    activate: "Aktifkan",
+    toggleBanner: (action: string, title: string) => `${action} banner ${title}`,
+    confirmDeactivate: (title: string) => `Nonaktifkan banner ${title}?`,
+    formTitleCreate: "Buat banner",
+    formTitleEdit: "Edit banner",
+    formEyebrow: "area campaign",
+    title: "Judul",
+    imageUrl: "URL gambar",
+    link: "Link",
+    sortOrder: "Urutan tampil",
+    activeHelp: "Banner nonaktif disembunyikan dari carousel home.",
+    publish: "Publish banner",
+    update: "Perbarui banner",
+    cancel: "Batal edit",
+    previewHint: "Preview muncul setelah URL aset valid.",
+    preview: "Preview banner",
+  },
+};
+
 export function BannersPage() {
   const token = useToken();
+  const { language } = useI18n();
+  const c = copy[language];
   const queryClient = useQueryClient();
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
   const bannersQuery = useQuery({
@@ -64,9 +176,9 @@ export function BannersPage() {
       setEditingBanner(null);
       form.reset(emptyBannerForm);
       await queryClient.invalidateQueries({ queryKey: ["banners"] });
-      toast.success("Banner created");
+      toast.success(c.created);
     },
-    onError: (error) => toast.error(readError(error)),
+    onError: (error) => toast.error(readError(error, language)),
   });
   const updateBanner = useMutation({
     mutationFn: ({ id, values }: { id: string; values: BannerForm }) =>
@@ -79,9 +191,9 @@ export function BannersPage() {
       setEditingBanner(null);
       form.reset(emptyBannerForm);
       await queryClient.invalidateQueries({ queryKey: ["banners"] });
-      toast.success("Banner updated");
+      toast.success(c.updated);
     },
-    onError: (error) => toast.error(readError(error)),
+    onError: (error) => toast.error(readError(error, language)),
   });
   const deleteBanner = useMutation({
     mutationFn: (id: string) =>
@@ -92,9 +204,9 @@ export function BannersPage() {
         form.reset(emptyBannerForm);
       }
       await queryClient.invalidateQueries({ queryKey: ["banners"] });
-      toast.success("Banner deactivated");
+      toast.success(c.deactivated);
     },
-    onError: (error) => toast.error(readError(error)),
+    onError: (error) => toast.error(readError(error, language)),
   });
   const toggleBanner = useMutation({
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
@@ -108,14 +220,14 @@ export function BannersPage() {
         form.setValue("isActive", variables.isActive);
       }
       await queryClient.invalidateQueries({ queryKey: ["banners"] });
-      toast.success("Banner status updated");
+      toast.success(c.statusUpdated);
     },
-    onError: (error) => toast.error(readError(error)),
+    onError: (error) => toast.error(readError(error, language)),
   });
 
   if (bannersQuery.isLoading) return <LoadingState />;
   if (bannersQuery.error)
-    return <ErrorState message={readError(bannersQuery.error)} />;
+    return <ErrorState message={readError(bannersQuery.error, language)} />;
 
   const banners = bannersQuery.data ?? [];
   const savingBanner = createBanner.isPending || updateBanner.isPending;
@@ -136,14 +248,14 @@ export function BannersPage() {
   return (
     <div className="split-layout">
       <Panel
-        title="Home banners"
-        eyebrow="visual merchandising"
+        title={c.listTitle}
+        eyebrow={c.listEyebrow}
         className="banner-list-panel"
       >
         <div className="banner-wall">
           {banners.length === 0 ? (
             <div className="empty-inline">
-              No banners yet. Publish one to fill the home carousel.
+              {c.empty}
             </div>
           ) : (
             banners.map((banner) => {
@@ -169,7 +281,7 @@ export function BannersPage() {
                     ) : (
                       <div className="banner-media-empty">
                         <ImageOff size={18} />
-                        <span>Image unavailable</span>
+                        <span>{c.imageUnavailable}</span>
                       </div>
                     )}
                   </div>
@@ -177,22 +289,22 @@ export function BannersPage() {
                     <div className="banner-card-heading">
                       <strong title={banner.title}>{banner.title}</strong>
                       <Badge tone={banner.isActive ? "good" : "neutral"}>
-                        {banner.isActive ? "Active" : "Inactive"}
+                        {banner.isActive ? c.active : c.inactive}
                       </Badge>
                     </div>
                     <div className="banner-meta">
                       <span title={banner.link ?? undefined}>
-                        {banner.link || "No link"}
+                        {banner.link || c.noLink}
                       </span>
-                      <span>Order {banner.sortOrder}</span>
+                      <span>{c.order} {banner.sortOrder}</span>
                     </div>
                   </div>
                   <div className="banner-actions">
                     <button
                       className="icon-button"
                       type="button"
-                      aria-label={`Edit banner ${banner.title}`}
-                      title="Edit"
+                      aria-label={c.editBanner(banner.title)}
+                      title={c.edit}
                       onClick={() => startEditingBanner(banner)}
                     >
                       <Pencil size={16} aria-hidden="true" />
@@ -200,13 +312,16 @@ export function BannersPage() {
                     <button
                       className={`icon-button banner-action${banner.isActive ? " icon-button-danger" : ""}`}
                       type="button"
-                      aria-label={`${banner.isActive ? "Deactivate" : "Activate"} banner ${banner.title}`}
-                      title={banner.isActive ? "Deactivate" : "Activate"}
+                      aria-label={c.toggleBanner(
+                        banner.isActive ? c.deactivate : c.activate,
+                        banner.title,
+                      )}
+                      title={banner.isActive ? c.deactivate : c.activate}
                       disabled={deleteBanner.isPending || toggleBanner.isPending}
                       onClick={() => {
                         if (banner.isActive) {
                           if (
-                            window.confirm(`Deactivate banner ${banner.title}?`)
+                            window.confirm(c.confirmDeactivate(banner.title))
                           ) {
                             deleteBanner.mutate(banner.id);
                           }
@@ -229,8 +344,8 @@ export function BannersPage() {
         </div>
       </Panel>
       <Panel
-        title={editingBanner ? "Edit banner" : "Create banner"}
-        eyebrow={editingBanner ? editingBanner.title : "campaign surface"}
+        title={editingBanner ? c.formTitleEdit : c.formTitleCreate}
+        eyebrow={editingBanner ? editingBanner.title : c.formEyebrow}
       >
         <form
           id="banner-form"
@@ -242,56 +357,78 @@ export function BannersPage() {
           )}
         >
           <label htmlFor="banner-title">
-            Title
+            {c.title}
             <input
               id="banner-title"
               {...form.register("title")}
-              placeholder="Title"
+              placeholder={c.title}
             />
             {form.formState.errors.title && (
               <span className="field-error">
-                {form.formState.errors.title.message}
+                {readFormError(form.formState.errors.title.message, language)}
               </span>
             )}
           </label>
           <label htmlFor="banner-image">
-            Image URL
+            {c.imageUrl}
             <input
               id="banner-image"
               {...form.register("image")}
-              placeholder="Image URL"
+              placeholder={c.imageUrl}
+            />
+            <ImageUploadButton
+              disabled={savingBanner}
+              onUploaded={(url) =>
+                form.setValue("image", url, {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                })
+              }
             />
             {form.formState.errors.image && (
               <span className="field-error">
-                {form.formState.errors.image.message}
+                {readFormError(form.formState.errors.image.message, language)}
               </span>
             )}
-            <BannerAssetPreview value={bannerImagePreview} />
+            <BannerAssetPreview
+              value={bannerImagePreview}
+              hint={c.previewHint}
+              label={c.preview}
+            />
           </label>
           <label htmlFor="banner-link">
-            Link
+            {c.link}
             <input
               id="banner-link"
               {...form.register("link")}
-              placeholder="Link"
+              placeholder={c.link}
             />
             {form.formState.errors.link && (
               <span className="field-error">
-                {form.formState.errors.link.message}
+                {readFormError(form.formState.errors.link.message, language)}
               </span>
             )}
           </label>
           <label htmlFor="banner-sortOrder">
-            Sort order
-            <input
-              id="banner-sortOrder"
-              {...form.register("sortOrder")}
-              type="number"
-              placeholder="Sort order"
+            {c.sortOrder}
+            <Controller
+              control={form.control}
+              name="sortOrder"
+              render={({ field }) => (
+                <NumberInput
+                  id="banner-sortOrder"
+                  name={field.name}
+                  ref={field.ref}
+                  value={field.value}
+                  onBlur={field.onBlur}
+                  onValueChange={field.onChange}
+                  placeholder={c.sortOrder}
+                />
+              )}
             />
             {form.formState.errors.sortOrder && (
               <span className="field-error">
-                {form.formState.errors.sortOrder.message}
+                {readFormError(form.formState.errors.sortOrder.message, language)}
               </span>
             )}
           </label>
@@ -302,8 +439,8 @@ export function BannersPage() {
               {...form.register("isActive")}
             />
             <span>
-              <strong>Active</strong>
-              <small>Inactive banners are hidden from the home carousel.</small>
+              <strong>{c.active}</strong>
+              <small>{c.activeHelp}</small>
             </span>
           </label>
           <div className="form-actions">
@@ -312,8 +449,8 @@ export function BannersPage() {
               type="submit"
               disabled={savingBanner}
             >
-              <Megaphone size={17} /> {editingBanner ? "Update" : "Publish"}
-              banner
+              <Megaphone size={17} />
+              {editingBanner ? c.update : c.publish}
             </button>
             {editingBanner && (
               <button
@@ -322,7 +459,7 @@ export function BannersPage() {
                 disabled={savingBanner}
                 onClick={cancelEditingBanner}
               >
-                Cancel edit
+                {c.cancel}
               </button>
             )}
           </div>
@@ -350,17 +487,25 @@ function bannerToForm(banner: Banner): BannerFormInput {
   };
 }
 
-function BannerAssetPreview({ value }: { value?: string }) {
+function BannerAssetPreview({
+  value,
+  hint,
+  label,
+}: {
+  value?: string;
+  hint: string;
+  label: string;
+}) {
   const trimmed = value?.trim() ?? "";
   if (!trimmed) return null;
   if (!isAssetUrl(trimmed)) {
-    return <span className="field-hint">Preview appears after a valid asset URL.</span>;
+    return <span className="field-hint">{hint}</span>;
   }
 
   return (
     <div className="asset-preview banner-form-preview">
-      <img src={normalizeAssetUrl(trimmed)} alt="Banner preview" loading="lazy" />
-      <span>Banner preview</span>
+      <img src={normalizeAssetUrl(trimmed)} alt={label} loading="lazy" />
+      <span>{label}</span>
     </div>
   );
 }

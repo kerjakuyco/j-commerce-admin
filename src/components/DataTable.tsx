@@ -1,9 +1,11 @@
+import { useI18n } from "../context/I18nContext";
+
 type ColumnDef = { label: string; key: string } | string;
 
 export function DataTable({
   columns,
   rows,
-  empty = "No records yet.",
+  empty,
   keyExtractor,
   caption,
 }: {
@@ -13,6 +15,9 @@ export function DataTable({
   keyExtractor?: (row: React.ReactNode[], index: number) => string | number;
   caption: string;
 }) {
+  const { t } = useI18n();
+  const emptyCopy = empty ?? t.common.noRecords;
+
   return (
     <div
       className={`table-frame${rows.length === 0 ? " table-frame-empty" : ""}`}
@@ -39,7 +44,7 @@ export function DataTable({
           {rows.length === 0 ? (
             <tr>
               <td colSpan={columns.length} className="table-empty">
-                <div className="table-empty-state">{empty}</div>
+                <div className="table-empty-state">{emptyCopy}</div>
               </td>
             </tr>
           ) : (

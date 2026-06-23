@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { orderTone, paymentTone } from "../components/Badge";
 import { isAssetUrl, normalizeAssetUrl } from "./asset-url";
-import { money, readError, slugify, toNumber } from "./format";
+import {
+  formatWholeNumberInput,
+  money,
+  parseWholeNumberInput,
+  readError,
+  readFormError,
+  slugify,
+  toNumber,
+} from "./format";
 
 describe("format utilities", () => {
   it("formats money as IDR without decimals", () => {
-    expect(money(125000)).toBe("Rp\u00a0125.000");
+    expect(money(125000)).toBe("Rp125.000");
   });
 
   it("normalizes numeric inputs and fallbacks", () => {
@@ -20,6 +28,31 @@ describe("format utilities", () => {
   it("reads safe error messages", () => {
     expect(readError(new Error("failed"))).toBe("failed");
     expect(readError("failed")).toBe("Something went wrong");
+  });
+
+  it("formats whole-number inputs by admin language", () => {
+    expect(formatWholeNumberInput("1250000", "en")).toBe("1,250,000");
+    expect(formatWholeNumberInput("1250000", "id")).toBe("1.250.000");
+  });
+
+  it("parses formatted whole-number input", () => {
+    expect(parseWholeNumberInput("1,250,000")).toBe("1250000");
+    expect(parseWholeNumberInput("1.250.000")).toBe("1250000");
+  });
+
+  it("humanizes technical form errors", () => {
+    expect(readFormError("Invalid input: expected number, received NaN")).toBe(
+      "Enter a valid number",
+    );
+    expect(
+      readFormError("Too small: expected string to have >=3 characters"),
+    ).toBe("Enter at least 3 characters");
+  });
+
+  it("humanizes technical form errors in Indonesian", () => {
+    expect(
+      readFormError("Invalid input: expected number, received NaN", "id"),
+    ).toBe("Masukkan angka yang valid");
   });
 });
 

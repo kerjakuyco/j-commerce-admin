@@ -6,9 +6,10 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { Panel } from "../components/Panel";
 import { useToken } from "../context/AuthContext";
+import { useI18n, type Language } from "../context/I18nContext";
 import { notificationTypes } from "../lib/constants";
 import { request } from "../lib/api";
-import { readError } from "../lib/format";
+import { readError, readFormError } from "../lib/format";
 import type { NotificationType } from "../types";
 
 const notificationSchema = z.object({
@@ -20,8 +21,67 @@ const notificationSchema = z.object({
 type NotificationFormInput = z.input<typeof notificationSchema>;
 type NotificationForm = z.output<typeof notificationSchema>;
 
+type NotificationsCopy = {
+  sent: string;
+  confirm: string;
+  title: string;
+  eyebrow: string;
+  type: string;
+  typeLabels: Record<NotificationType, string>;
+  messageTitle: string;
+  message: string;
+  placeholderTitle: string;
+  placeholderBody: string;
+  sending: string;
+  send: string;
+  guidanceTitle: string;
+  guidanceEyebrow: string;
+  guidance: string;
+};
+
+const copy: Record<Language, NotificationsCopy> = {
+  en: {
+    sent: "Broadcast sent",
+    confirm: "Send this broadcast to all customers?",
+    title: "Broadcast message",
+    eyebrow: "notifications",
+    type: "Type",
+    typeLabels: { PROMO: "Promo", ORDER: "Order", SYSTEM: "System" },
+    messageTitle: "Title",
+    message: "Message",
+    placeholderTitle: "Flash Sale Started",
+    placeholderBody: "Write the broadcast body...",
+    sending: "Sending...",
+    send: "Send broadcast",
+    guidanceTitle: "Delivery guidance",
+    guidanceEyebrow: "operator notes",
+    guidance:
+      "Broadcast creates a global in-app notification. User-specific order signals are created automatically by order status and payment changes from the API.",
+  },
+  id: {
+    sent: "Broadcast terkirim",
+    confirm: "Kirim broadcast ini ke semua pelanggan?",
+    title: "Broadcast message",
+    eyebrow: "notifikasi",
+    type: "Tipe",
+    typeLabels: { PROMO: "Promo", ORDER: "Order", SYSTEM: "System" },
+    messageTitle: "Judul",
+    message: "Pesan",
+    placeholderTitle: "Flash Sale Dimulai",
+    placeholderBody: "Tulis isi broadcast...",
+    sending: "Mengirim...",
+    send: "Kirim broadcast",
+    guidanceTitle: "Catatan pengiriman",
+    guidanceEyebrow: "operator notes",
+    guidance:
+      "Broadcast membuat notifikasi in-app global. Sinyal pesanan per pengguna dibuat otomatis oleh API saat status pesanan dan pembayaran berubah.",
+  },
+};
+
 export function NotificationsPage() {
   const token = useToken();
+  const { language } = useI18n();
+  const c = copy[language];
   const form = useForm<NotificationFormInput, unknown, NotificationForm>({
     resolver: zodResolver(notificationSchema),
     defaultValues: { type: "SYSTEM", title: "", body: "" },
@@ -35,58 +95,58 @@ export function NotificationsPage() {
       }),
     onSuccess: () => {
       form.reset({ type: "SYSTEM", title: "", body: "" });
-      toast.success("Broadcast sent");
+      toast.success(c.sent);
     },
-    onError: (error) => toast.error(readError(error)),
+    onError: (error) => toast.error(readError(error, language)),
   });
 
   return (
     <div className="split-layout">
-      <Panel title="Broadcast message" eyebrow="notifications">
+      <Panel title={c.title} eyebrow={c.eyebrow}>
         <form
           className="control-form"
           onSubmit={form.handleSubmit((values) => {
-            if (window.confirm("Send this broadcast to all customers?")) {
+            if (window.confirm(c.confirm)) {
               mutation.mutate(values);
             }
           })}
         >
           <label htmlFor="notification-type">
-            Type
+            {c.type}
             <select id="notification-type" {...form.register("type")}>
               {notificationTypes.map((type: NotificationType) => (
-                <option key={type}>{type}</option>
+                <option key={type} value={type}>{c.typeLabels[type]}</option>
               ))}
             </select>
             {form.formState.errors.type && (
               <span className="field-error">
-                {form.formState.errors.type.message}
+                {readFormError(form.formState.errors.type.message, language)}
               </span>
             )}
           </label>
           <label htmlFor="notification-title">
-            Title
+            {c.messageTitle}
             <input
               id="notification-title"
               {...form.register("title")}
-              placeholder="Flash Sale Dimulai"
+              placeholder={c.placeholderTitle}
             />
             {form.formState.errors.title && (
               <span className="field-error">
-                {form.formState.errors.title.message}
+                {readFormError(form.formState.errors.title.message, language)}
               </span>
             )}
           </label>
           <label htmlFor="notification-body">
-            Message
+            {c.message}
             <textarea
               id="notification-body"
               {...form.register("body")}
-              placeholder="Write the broadcast body…"
+              placeholder={c.placeholderBody}
             />
             {form.formState.errors.body && (
               <span className="field-error">
-                {form.formState.errors.body.message}
+                {readFormError(form.formState.errors.body.message, language)}
               </span>
             )}
           </label>
@@ -97,16 +157,14 @@ export function NotificationsPage() {
               disabled={mutation.isPending}
             >
               <Radio size={17} />
-              {mutation.isPending ? "Sending…" : "Send broadcast"}
+              {mutation.isPending ? c.sending : c.send}
             </button>
           </div>
         </form>
       </Panel>
-      <Panel title="Delivery guidance" eyebrow="operator notes">
+      <Panel title={c.guidanceTitle} eyebrow={c.guidanceEyebrow}>
         <p className="copy-block">
-          Broadcast creates a global notification (`userId: null`).
-          User-specific order signals are created automatically by order status
-          and payment changes from the API.
+          {c.guidance}
         </p>
       </Panel>
     </div>

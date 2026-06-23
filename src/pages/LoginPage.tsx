@@ -7,7 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import { LanguageToggle } from "../components/LanguageToggle";
 import { API_BASE_URL, login } from "../lib/api";
-import { readError } from "../lib/format";
+import { readError, readFormError } from "../lib/format";
 
 const loginSchema = z.object({
   email: z.preprocess(
@@ -22,7 +22,7 @@ type LoginForm = z.output<typeof loginSchema>;
 
 export function LoginPage() {
   const { session, setSession } = useAuth();
-  const { t } = useI18n();
+  const { language, t } = useI18n();
   const form = useForm<LoginFormInput, unknown, LoginForm>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
@@ -39,7 +39,7 @@ export function LoginPage() {
       setSession(nextSession);
       toast.success(t.login.welcome(nextSession.user.name));
     } catch (error) {
-      toast.error(readError(error));
+      toast.error(readError(error, language));
     }
   }
 
@@ -54,7 +54,7 @@ export function LoginPage() {
         </div>
         <form className="login-card" onSubmit={form.handleSubmit(submit)}>
           <LanguageToggle />
-          <div>
+          <div className="login-api-target">
             <span className="eyebrow">{t.login.apiTarget}</span>
             <code>{API_BASE_URL}</code>
           </div>
@@ -69,7 +69,7 @@ export function LoginPage() {
             />
             {form.formState.errors.email && (
               <span className="field-error">
-                {form.formState.errors.email.message}
+                {readFormError(form.formState.errors.email.message, language)}
               </span>
             )}
           </label>
@@ -83,7 +83,7 @@ export function LoginPage() {
             />
             {form.formState.errors.password && (
               <span className="field-error">
-                {form.formState.errors.password.message}
+                {readFormError(form.formState.errors.password.message, language)}
               </span>
             )}
           </label>

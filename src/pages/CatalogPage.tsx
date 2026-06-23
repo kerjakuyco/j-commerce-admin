@@ -11,19 +11,28 @@ import {
   Trash2,
 } from "lucide-react";
 import { useState } from "react";
-import { useForm, useWatch } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Badge } from "../components/Badge";
 import { DataTable } from "../components/DataTable";
 import { ErrorState } from "../components/ErrorState";
+import { ImageUploadButton } from "../components/ImageUploadButton";
 import { LoadingState } from "../components/LoadingState";
+import { NumberInput } from "../components/NumberInput";
 import { Panel } from "../components/Panel";
 import { useToken } from "../context/AuthContext";
+import { useI18n, type Language } from "../context/I18nContext";
 import { request } from "../lib/api";
 import { assetUrlMessage, isAssetUrl, normalizeAssetUrl } from "../lib/asset-url";
-import { money, readError, slugify } from "../lib/format";
+import {
+  money,
+  parseWholeNumberInput,
+  readError,
+  readFormError,
+  slugify,
+} from "../lib/format";
 import type {
   Category,
   Paginated,
@@ -33,15 +42,27 @@ import type {
 } from "../types";
 
 const optionalNumber = z.preprocess(
-  (value) => (value === "" ? undefined : value),
+  (value) => {
+    if (typeof value !== "string") return value;
+    const normalized = parseWholeNumberInput(value);
+    return normalized === "" ? undefined : normalized;
+  },
   z.coerce.number().optional(),
 );
 const requiredNumber = z.preprocess(
-  (value) => (value === "" ? undefined : value),
+  (value) => {
+    if (typeof value !== "string") return value;
+    const normalized = parseWholeNumberInput(value);
+    return normalized === "" ? undefined : normalized;
+  },
   z.coerce.number(),
 );
 const requiredInt = z.preprocess(
-  (value) => (value === "" ? undefined : value),
+  (value) => {
+    if (typeof value !== "string") return value;
+    const normalized = parseWholeNumberInput(value);
+    return normalized === "" ? undefined : normalized;
+  },
   z.coerce.number().int(),
 );
 const assetUrlSchema = z
@@ -117,17 +138,262 @@ const emptyProductForm: ProductFormInput = {
   isFlashSale: false,
   flashSaleEndsAt: "",
 };
-const catalogSorts = [
-  { value: "newest", label: "Newest" },
-  { value: "price_asc", label: "Price low" },
-  { value: "price_desc", label: "Price high" },
-  { value: "rating", label: "Top rated" },
-  { value: "sold", label: "Best sold" },
-] as const;
-type CatalogSort = (typeof catalogSorts)[number]["value"];
+const catalogSorts = ["newest", "price_asc", "price_desc", "rating", "sold"] as const;
+type CatalogSort = (typeof catalogSorts)[number];
+
+const copy = {
+  en: {
+    sortLabels: {
+      newest: "Newest",
+      price_asc: "Price low",
+      price_desc: "Price high",
+      rating: "Top rated",
+      sold: "Best sold",
+    },
+    productCreated: "Product created",
+    productUpdated: "Product updated",
+    merchandisingUpdated: "Merchandising updated",
+    variantAdded: "Variant added",
+    categoryCreated: "Category created",
+    productRemoved: "Product removed",
+    imageAttached: "Gambar dipasang",
+    imageRemoved: "Gambar dihapus",
+    imageOrderUpdated: "Urutan gambar diperbarui",
+    invalidImageForm: "Select a product and enter a valid image URL",
+    productCatalog: "Product catalog",
+    skus: (count: number) => `${count} SKUs`,
+    filtersLabel: "Catalog filters",
+    search: "Search",
+    searchPlaceholder: "Name, brand, description",
+    category: "Category",
+    allCategories: "All categories",
+    sort: "Sort",
+    reset: "Reset",
+    tableCaption: "Product catalog table",
+    tableColumns: [
+      "Product",
+      "Brand",
+      "Category",
+      "Price",
+      "Rating",
+      "Variants",
+      "Stock",
+      "Merchandising",
+      "Action",
+    ],
+    editProduct: (name: string) => `Edit ${name}`,
+    deleteProduct: (name: string) => `Delete ${name}`,
+    edit: "Edit",
+    delete: "Delete",
+    deleteProductConfirm: (name: string) =>
+      `Remove product "${name}"? It will be hidden from the storefront but existing orders remain unaffected.`,
+    createProduct: "Create product",
+    productDetails: "product details",
+    name: "Name",
+    productName: "Product name",
+    slug: "Slug",
+    slugAuto: "Slug (auto if empty)",
+    brand: "Brand",
+    selectCategory: "Select category",
+    basePrice: "Base price",
+    discountPrice: "Discount price",
+    imageUrl: "Image URL",
+    productImagePreview: "Preview gambar produk",
+    homeSections: "Area home",
+    homeSectionsHelp: "Choose where this product appears.",
+    merchandisingFlags: "Merchandising flags",
+    featured: "Featured",
+    featuredHelp: "Produk Pilihan section.",
+    flashSale: "Flash sale",
+    flashSaleHelp: "Timed promo section.",
+    flashSaleEnds: "Flash sale berakhir",
+    flashSaleHint: "Optional. Quick actions use a 7-day window.",
+    description: "Description",
+    update: "Update",
+    create: "Create",
+    cancelEdit: "Cancel edit",
+    variantAndImage: "Variant and image",
+    inventory: "inventory",
+    product: "Product",
+    selectProduct: "Select product",
+    variantName: "Variant name",
+    sku: "SKU",
+    price: "Price",
+    stock: "Stock",
+    addVariant: "Add variant",
+    createCategory: "Create category",
+    organization: "organisasi",
+    categoryName: "Category name",
+    icon: "Icon",
+    sortOrder: "Sort order",
+    loadingProductImages: "Loading product images...",
+    imageGallery: "Image gallery",
+    imageGalleryHelp: "First image is used as the storefront primary image.",
+    noImages: "No images attached yet.",
+    primaryImage: "Primary image",
+    imageNumber: (index: number) => `Image ${index}`,
+    setImagePrimary: "Set image as primary",
+    setPrimary: "Set primary",
+    moveImageUp: "Move image up",
+    moveUp: "Move up",
+    moveImageDown: "Move image down",
+    moveDown: "Move down",
+    deleteImage: "Delete image",
+    deleteImageConfirm: "Delete this product image?",
+    on: "On",
+    off: "Off",
+    hide: "Hide",
+    show: "Show",
+    flash: "Flash",
+    expired: "Expired",
+    live: "Live",
+    flashExpired: "Expired",
+    flashEnds: "Ends",
+    startFlashWindow: "Start a 7-day flash window",
+    renew7d: "Renew 7d",
+    end: "End",
+    start7d: "Start 7d",
+    noVariants: "No variants",
+    out: "Out",
+    stockCount: (count: number) => `${count} stock`,
+    variantsMin: (count: number, min: number) => `${count} variants · min ${min}`,
+    previewHint: "Preview appears after a valid asset URL.",
+    noEndDate: "no end date",
+    invalidDate: "invalid date",
+    imageTarget: "Image target",
+    attachedImagePreview: "Attached image preview",
+    attachImage: "Attach image",
+  },
+  id: {
+    sortLabels: {
+      newest: "Terbaru",
+      price_asc: "Harga rendah",
+      price_desc: "Harga tinggi",
+      rating: "Rating tertinggi",
+      sold: "Terlaris",
+    },
+    productCreated: "Produk dibuat",
+    productUpdated: "Produk diperbarui",
+    merchandisingUpdated: "Merchandising diperbarui",
+    variantAdded: "Varian ditambahkan",
+    categoryCreated: "Kategori dibuat",
+    productRemoved: "Produk dihapus",
+    imageAttached: "Image attached",
+    imageRemoved: "Image removed",
+    imageOrderUpdated: "Image order updated",
+    invalidImageForm: "Pilih produk dan masukkan URL gambar yang valid",
+    productCatalog: "Katalog produk",
+    skus: (count: number) => `${count} SKU`,
+    filtersLabel: "Filter katalog",
+    search: "Cari",
+    searchPlaceholder: "Nama, brand, deskripsi",
+    category: "Kategori",
+    allCategories: "Semua kategori",
+    sort: "Urutkan",
+    reset: "Reset",
+    tableCaption: "Tabel katalog produk",
+    tableColumns: [
+      "Produk",
+      "Brand",
+      "Kategori",
+      "Harga",
+      "Rating",
+      "Varian",
+      "Stok",
+      "Merchandising",
+      "Aksi",
+    ],
+    editProduct: (name: string) => `Edit ${name}`,
+    deleteProduct: (name: string) => `Hapus ${name}`,
+    edit: "Edit",
+    delete: "Hapus",
+    deleteProductConfirm: (name: string) =>
+      `Hapus produk "${name}"? Produk akan disembunyikan dari storefront, tetapi pesanan yang ada tetap aman.`,
+    createProduct: "Buat produk",
+    productDetails: "detail produk",
+    name: "Nama",
+    productName: "Nama produk",
+    slug: "Slug",
+    slugAuto: "Slug (otomatis jika kosong)",
+    brand: "Brand",
+    selectCategory: "Pilih kategori",
+    basePrice: "Harga dasar",
+    discountPrice: "Harga diskon",
+    imageUrl: "Image URL",
+    productImagePreview: "Product image preview",
+    homeSections: "Home sections",
+    homeSectionsHelp: "Pilih area tampil produk ini.",
+    merchandisingFlags: "Flag merchandising",
+    featured: "Featured",
+    featuredHelp: "Section Produk Pilihan.",
+    flashSale: "Flash sale",
+    flashSaleHelp: "Section promo berbatas waktu.",
+    flashSaleEnds: "Flash sale ends",
+    flashSaleHint: "Opsional. Aksi cepat memakai jendela 7 hari.",
+    description: "Deskripsi",
+    update: "Perbarui",
+    create: "Buat",
+    cancelEdit: "Batal edit",
+    variantAndImage: "Varian dan gambar",
+    inventory: "inventory",
+    product: "Produk",
+    selectProduct: "Pilih produk",
+    variantName: "Nama varian",
+    sku: "SKU",
+    price: "Harga",
+    stock: "Stok",
+    addVariant: "Tambah varian",
+    createCategory: "Buat kategori",
+    organization: "organization",
+    categoryName: "Nama kategori",
+    icon: "Ikon",
+    sortOrder: "Urutan tampil",
+    loadingProductImages: "Memuat gambar produk...",
+    imageGallery: "Galeri gambar",
+    imageGalleryHelp: "Gambar pertama dipakai sebagai primary image storefront.",
+    noImages: "Belum ada gambar terpasang.",
+    primaryImage: "Primary image",
+    imageNumber: (index: number) => `Gambar ${index}`,
+    setImagePrimary: "Jadikan gambar utama",
+    setPrimary: "Set primary",
+    moveImageUp: "Naikkan gambar",
+    moveUp: "Naikkan",
+    moveImageDown: "Turunkan gambar",
+    moveDown: "Turunkan",
+    deleteImage: "Hapus gambar",
+    deleteImageConfirm: "Hapus gambar produk ini?",
+    on: "On",
+    off: "Off",
+    hide: "Hide",
+    show: "Show",
+    flash: "Flash",
+    expired: "Expired",
+    live: "Live",
+    flashExpired: "Expired",
+    flashEnds: "Ends",
+    startFlashWindow: "Mulai jendela flash 7 hari",
+    renew7d: "Renew 7d",
+    end: "End",
+    start7d: "Start 7d",
+    noVariants: "Tidak ada varian",
+    out: "Habis",
+    stockCount: (count: number) => `${count} stok`,
+    variantsMin: (count: number, min: number) => `${count} varian · min ${min}`,
+    previewHint: "Preview muncul setelah URL aset valid.",
+    noEndDate: "tanpa tanggal berakhir",
+    invalidDate: "tanggal tidak valid",
+    imageTarget: "Target gambar",
+    attachedImagePreview: "Preview gambar terpasang",
+    attachImage: "Pasang gambar",
+  },
+} as const;
+
+type CatalogCopy = (typeof copy)[Language];
 
 export function CatalogPage() {
   const token = useToken();
+  const { language } = useI18n();
+  const c = copy[language];
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const searchFromUrl = searchParams.get("search") ?? "";
@@ -220,9 +486,9 @@ export function CatalogPage() {
       setEditingProduct(null);
       productForm.reset(emptyProductForm);
       await invalidateCatalog();
-      toast.success("Product created");
+      toast.success(c.productCreated);
     },
-    onError: (error) => toast.error(readError(error)),
+    onError: (error) => toast.error(readError(error, language)),
   });
 
   const updateProduct = useMutation({
@@ -261,9 +527,9 @@ export function CatalogPage() {
       setEditingProduct(null);
       productForm.reset(emptyProductForm);
       await invalidateCatalog(variables.id);
-      toast.success("Product updated");
+      toast.success(c.productUpdated);
     },
-    onError: (error) => toast.error(readError(error)),
+    onError: (error) => toast.error(readError(error, language)),
   });
 
   const updateMerchandising = useMutation({
@@ -283,9 +549,9 @@ export function CatalogPage() {
       }),
     onSuccess: async () => {
       await invalidateCatalog();
-      toast.success("Merchandising updated");
+      toast.success(c.merchandisingUpdated);
     },
-    onError: (error) => toast.error(readError(error)),
+    onError: (error) => toast.error(readError(error, language)),
   });
 
   const createVariant = useMutation({
@@ -303,9 +569,9 @@ export function CatalogPage() {
     onSuccess: async () => {
       variantForm.reset();
       await invalidateCatalog();
-      toast.success("Variant added");
+      toast.success(c.variantAdded);
     },
-    onError: (error) => toast.error(readError(error)),
+    onError: (error) => toast.error(readError(error, language)),
   });
 
   const createCategory = useMutation({
@@ -321,9 +587,9 @@ export function CatalogPage() {
     onSuccess: async () => {
       categoryForm.reset({ name: "", slug: "", icon: "", sortOrder: 0 });
       await invalidateCatalog();
-      toast.success("Category created");
+      toast.success(c.categoryCreated);
     },
-    onError: (error) => toast.error(readError(error)),
+    onError: (error) => toast.error(readError(error, language)),
   });
 
   const deleteProduct = useMutation({
@@ -336,9 +602,9 @@ export function CatalogPage() {
       }),
     onSuccess: async () => {
       await invalidateCatalog();
-      toast.success("Product removed");
+      toast.success(c.productRemoved);
     },
-    onError: (error) => toast.error(readError(error)),
+    onError: (error) => toast.error(readError(error, language)),
   });
 
   const addImage = useMutation({
@@ -350,9 +616,9 @@ export function CatalogPage() {
       }),
     onSuccess: async (_image, variables) => {
       await invalidateCatalog(variables.productId);
-      toast.success("Image attached");
+      toast.success(c.imageAttached);
     },
-    onError: (error) => toast.error(readError(error)),
+    onError: (error) => toast.error(readError(error, language)),
   });
 
   const deleteImage = useMutation({
@@ -363,9 +629,9 @@ export function CatalogPage() {
       }),
     onSuccess: async (_result, variables) => {
       await invalidateCatalog(variables.productId);
-      toast.success("Image removed");
+      toast.success(c.imageRemoved);
     },
-    onError: (error) => toast.error(readError(error)),
+    onError: (error) => toast.error(readError(error, language)),
   });
 
   const reorderImages = useMutation({
@@ -383,17 +649,17 @@ export function CatalogPage() {
       }),
     onSuccess: async (_result, variables) => {
       await invalidateCatalog(variables.productId);
-      toast.success("Image order updated");
+      toast.success(c.imageOrderUpdated);
     },
-    onError: (error) => toast.error(readError(error)),
+    onError: (error) => toast.error(readError(error, language)),
   });
 
   if (productsQuery.isLoading || categoriesQuery.isLoading)
     return <LoadingState />;
   if (productsQuery.error)
-    return <ErrorState message={readError(productsQuery.error)} />;
+    return <ErrorState message={readError(productsQuery.error, language)} />;
   if (categoriesQuery.error)
-    return <ErrorState message={readError(categoriesQuery.error)} />;
+    return <ErrorState message={readError(categoriesQuery.error, language)} />;
 
   const products = productsQuery.data?.data ?? [];
   const categories = categoriesQuery.data ?? [];
@@ -415,29 +681,29 @@ export function CatalogPage() {
   return (
     <div className="catalog-layout">
       <Panel
-        title="Product catalog"
-        eyebrow={`${products.length} SKUs`}
+        title={c.productCatalog}
+        eyebrow={c.skus(products.length)}
         className="catalog-table-panel"
       >
-        <div className="catalog-toolbar" aria-label="Catalog filters">
+        <div className="catalog-toolbar" aria-label={c.filtersLabel}>
           <label htmlFor="catalog-search">
-            Search
+            {c.search}
             <input
               id="catalog-search"
               value={catalogSearch}
               onChange={(event) => setCatalogParam("search", event.target.value)}
-              placeholder="Name, brand, description"
+              placeholder={c.searchPlaceholder}
               type="search"
             />
           </label>
           <label htmlFor="catalog-category-filter">
-            Category
+            {c.category}
             <select
               id="catalog-category-filter"
               value={catalogCategoryId}
               onChange={(event) => setCatalogParam("categoryId", event.target.value)}
             >
-              <option value="">All categories</option>
+              <option value="">{c.allCategories}</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.name}
@@ -446,15 +712,15 @@ export function CatalogPage() {
             </select>
           </label>
           <label htmlFor="catalog-sort">
-            Sort
+            {c.sort}
             <select
               id="catalog-sort"
               value={catalogSort}
               onChange={(event) => setCatalogSort(event.target.value as CatalogSort)}
             >
               {catalogSorts.map((sort) => (
-                <option key={sort.value} value={sort.value}>
-                  {sort.label}
+                <option key={sort} value={sort}>
+                  {c.sortLabels[sort]}
                 </option>
               ))}
             </select>
@@ -467,22 +733,12 @@ export function CatalogPage() {
               setCatalogSort("newest");
             }}
           >
-            Reset
+            {c.reset}
           </button>
         </div>
         <DataTable
-          caption="Product catalog table"
-          columns={[
-            "Product",
-            "Brand",
-            "Category",
-            "Price",
-            "Rating",
-            "Variants",
-            "Stock",
-            "Merchandising",
-            "Action",
-          ]}
+          caption={c.tableCaption}
+          columns={[...c.tableColumns]}
           keyExtractor={(_row, index) => products[index]?.id ?? index}
           rows={products.map((product) => [
             product.name,
@@ -491,9 +747,11 @@ export function CatalogPage() {
             money(product.discountPrice ?? product.basePrice),
             <Badge tone="hot">{product.rating.toFixed(1)}</Badge>,
             product._count?.variants ?? product.variants?.length ?? 0,
-            <StockCell product={product} />,
+            <StockCell product={product} c={c} />,
             <ProductMerchandisingCell
               product={product}
+              language={language}
+              c={c}
               disabled={updateMerchandising.isPending}
               onUpdate={(values) =>
                 updateMerchandising.mutate({ id: product.id, ...values })
@@ -503,8 +761,8 @@ export function CatalogPage() {
               <button
                 className="icon-button"
                 type="button"
-                aria-label={`Edit ${product.name}`}
-                title="Edit"
+                aria-label={c.editProduct(product.name)}
+                title={c.edit}
                 onClick={() => startEditingProduct(product)}
               >
                 <Pencil size={16} aria-hidden="true" />
@@ -512,14 +770,10 @@ export function CatalogPage() {
               <button
                 className="icon-button icon-button-danger"
                 type="button"
-                aria-label={`Delete ${product.name}`}
-                title="Delete"
+                aria-label={c.deleteProduct(product.name)}
+                title={c.delete}
                 onClick={() => {
-                  if (
-                    window.confirm(
-                      `Remove product "${product.name}"? It will be hidden from the storefront but existing orders remain unaffected.`,
-                    )
-                  ) {
+                  if (window.confirm(c.deleteProductConfirm(product.name))) {
                     deleteProduct.mutate(product.id);
                   }
                 }}
@@ -531,8 +785,8 @@ export function CatalogPage() {
         />
       </Panel>
       <Panel
-        title={editingProduct ? "Edit product" : "Create product"}
-        eyebrow={editingProduct ? editingProduct.name : "product details"}
+        title={editingProduct ? c.editProduct(editingProduct.name) : c.createProduct}
+        eyebrow={editingProduct ? editingProduct.name : c.productDetails}
         className="catalog-product-panel"
       >
         <form
@@ -545,51 +799,51 @@ export function CatalogPage() {
           )}
         >
           <label htmlFor="product-name">
-            Name
+            {c.name}
             <input
               id="product-name"
               {...productForm.register("name")}
-              placeholder="Product name"
+              placeholder={c.productName}
             />
             {productForm.formState.errors.name && (
               <span className="field-error">
-                {productForm.formState.errors.name.message}
+                {readFormError(productForm.formState.errors.name.message, language)}
               </span>
             )}
           </label>
           <label htmlFor="product-slug">
-            Slug
+            {c.slug}
             <input
               id="product-slug"
               {...productForm.register("slug")}
-              placeholder="Slug (auto if empty)"
+              placeholder={c.slugAuto}
             />
             {productForm.formState.errors.slug && (
               <span className="field-error">
-                {productForm.formState.errors.slug.message}
+                {readFormError(productForm.formState.errors.slug.message, language)}
               </span>
             )}
           </label>
           <label htmlFor="product-brand">
-            Brand
+            {c.brand}
             <input
               id="product-brand"
               {...productForm.register("brand")}
-              placeholder="Brand"
+              placeholder={c.brand}
             />
             {productForm.formState.errors.brand && (
               <span className="field-error">
-                {productForm.formState.errors.brand.message}
+                {readFormError(productForm.formState.errors.brand.message, language)}
               </span>
             )}
           </label>
           <label htmlFor="product-category">
-            Category
+            {c.category}
             <select
               id="product-category"
               {...productForm.register("categoryId")}
             >
-              <option value="">Select category</option>
+              <option value="">{c.selectCategory}</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
                   {category.name}
@@ -598,58 +852,85 @@ export function CatalogPage() {
             </select>
             {productForm.formState.errors.categoryId && (
               <span className="field-error">
-                {productForm.formState.errors.categoryId.message}
+                {readFormError(productForm.formState.errors.categoryId.message, language)}
               </span>
             )}
           </label>
           <label htmlFor="product-basePrice">
-            Base price
-            <input
-              id="product-basePrice"
-              {...productForm.register("basePrice")}
-              type="number"
-              placeholder="Base price"
+            {c.basePrice}
+            <Controller
+              control={productForm.control}
+              name="basePrice"
+              render={({ field }) => (
+                <NumberInput
+                  id="product-basePrice"
+                  name={field.name}
+                  ref={field.ref}
+                  value={field.value}
+                  onBlur={field.onBlur}
+                  onValueChange={field.onChange}
+                  placeholder={c.basePrice}
+                />
+              )}
             />
             {productForm.formState.errors.basePrice && (
               <span className="field-error">
-                {productForm.formState.errors.basePrice.message}
+                {readFormError(productForm.formState.errors.basePrice.message, language)}
               </span>
             )}
           </label>
           <label htmlFor="product-discountPrice">
-            Discount price
-            <input
-              id="product-discountPrice"
-              {...productForm.register("discountPrice")}
-              type="number"
-              placeholder="Discount price"
+            {c.discountPrice}
+            <Controller
+              control={productForm.control}
+              name="discountPrice"
+              render={({ field }) => (
+                <NumberInput
+                  id="product-discountPrice"
+                  name={field.name}
+                  ref={field.ref}
+                  value={field.value}
+                  onBlur={field.onBlur}
+                  onValueChange={field.onChange}
+                  placeholder={c.discountPrice}
+                />
+              )}
             />
             {productForm.formState.errors.discountPrice && (
               <span className="field-error">
-                {productForm.formState.errors.discountPrice.message}
+                {readFormError(productForm.formState.errors.discountPrice.message, language)}
               </span>
             )}
           </label>
           <label className="field-wide" htmlFor="product-imageUrl">
-            Image URL
+            {c.imageUrl}
             <input
               id="product-imageUrl"
               {...productForm.register("imageUrl")}
-              placeholder="Image URL"
+              placeholder={c.imageUrl}
+            />
+            <ImageUploadButton
+              disabled={savingProduct}
+              onUploaded={(url) =>
+                productForm.setValue("imageUrl", url, {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                })
+              }
             />
             {productForm.formState.errors.imageUrl && (
               <span className="field-error">
-                {productForm.formState.errors.imageUrl.message}
+                {readFormError(productForm.formState.errors.imageUrl.message, language)}
               </span>
             )}
-            <AssetPreview value={productImagePreview} label="Product image preview" />
+            <AssetPreview value={productImagePreview} label={c.productImagePreview} c={c} />
           </label>
           <div className="merch-form-panel field-wide">
             <div className="merch-form-heading">
-              <strong>Home sections</strong>
-              <span>Choose where this product appears.</span>
+              <strong>{c.homeSections}</strong>
+              <span>{c.homeSectionsHelp}</span>
             </div>
-            <div className="check-grid" aria-label="Merchandising flags">
+            <div className="check-grid" aria-label={c.merchandisingFlags}>
               <label className="check-row" htmlFor="product-isFeatured">
                 <input
                   id="product-isFeatured"
@@ -657,8 +938,8 @@ export function CatalogPage() {
                   {...productForm.register("isFeatured")}
                 />
                 <span>
-                  <strong>Featured</strong>
-                  <small>Produk Pilihan section.</small>
+                  <strong>{c.featured}</strong>
+                  <small>{c.featuredHelp}</small>
                 </span>
               </label>
               <label className="check-row" htmlFor="product-isFlashSale">
@@ -668,38 +949,41 @@ export function CatalogPage() {
                   {...productForm.register("isFlashSale")}
                 />
                 <span>
-                  <strong>Flash sale</strong>
-                  <small>Timed promo section.</small>
+                  <strong>{c.flashSale}</strong>
+                  <small>{c.flashSaleHelp}</small>
                 </span>
               </label>
             </div>
             <label className="merch-form-date" htmlFor="product-flashSaleEndsAt">
-              Flash sale ends
+              {c.flashSaleEnds}
               <input
                 id="product-flashSaleEndsAt"
                 {...productForm.register("flashSaleEndsAt")}
                 type="datetime-local"
               />
               <span className="field-hint">
-                Optional. Quick actions use a 7-day window.
+                {c.flashSaleHint}
               </span>
               {productForm.formState.errors.flashSaleEndsAt && (
                 <span className="field-error">
-                  {productForm.formState.errors.flashSaleEndsAt.message}
+                  {readFormError(
+                    productForm.formState.errors.flashSaleEndsAt.message,
+                    language,
+                  )}
                 </span>
               )}
             </label>
           </div>
           <label className="field-wide" htmlFor="product-description">
-            Description
+            {c.description}
             <textarea
               id="product-description"
               {...productForm.register("description")}
-              placeholder="Description"
+              placeholder={c.description}
             />
             {productForm.formState.errors.description && (
               <span className="field-error">
-                {productForm.formState.errors.description.message}
+                {readFormError(productForm.formState.errors.description.message, language)}
               </span>
             )}
           </label>
@@ -709,7 +993,7 @@ export function CatalogPage() {
               type="submit"
               disabled={savingProduct}
             >
-              <PackagePlus size={17} /> {editingProduct ? "Update" : "Create"}
+              <PackagePlus size={17} /> {editingProduct ? c.update : c.create}
             </button>
             {editingProduct && (
               <button
@@ -718,7 +1002,7 @@ export function CatalogPage() {
                 disabled={savingProduct}
                 onClick={cancelEditingProduct}
               >
-                Cancel edit
+                {c.cancelEdit}
               </button>
             )}
           </div>
@@ -729,6 +1013,7 @@ export function CatalogPage() {
             loading={productDetailQuery.isLoading}
             deletingImageId={deleteImage.variables?.id}
             disabled={deleteImage.isPending || reorderImages.isPending}
+            c={c}
             onDelete={(productId, imageId) =>
               deleteImage.mutate({ productId, id: imageId })
             }
@@ -739,7 +1024,7 @@ export function CatalogPage() {
         )}
       </Panel>
       <div className="catalog-side-stack">
-        <Panel title="Variant and image" eyebrow="inventory">
+        <Panel title={c.variantAndImage} eyebrow={c.inventory}>
           <form
             className="control-form"
             onSubmit={variantForm.handleSubmit((values) =>
@@ -747,12 +1032,12 @@ export function CatalogPage() {
             )}
           >
             <label htmlFor="variant-productId">
-              Product
+              {c.product}
               <select
                 id="variant-productId"
                 {...variantForm.register("productId")}
               >
-                <option value="">Select product</option>
+                  <option value="">{c.selectProduct}</option>
                 {products.map((product) => (
                   <option key={product.id} value={product.id}>
                     {product.name}
@@ -761,63 +1046,79 @@ export function CatalogPage() {
               </select>
               {variantForm.formState.errors.productId && (
                 <span className="field-error">
-                  {variantForm.formState.errors.productId.message}
+                  {readFormError(variantForm.formState.errors.productId.message, language)}
                 </span>
               )}
             </label>
             <label htmlFor="variant-name">
-              Variant name
+              {c.variantName}
               <input
                 id="variant-name"
                 {...variantForm.register("name")}
-                placeholder="Variant name"
+                placeholder={c.variantName}
               />
               {variantForm.formState.errors.name && (
                 <span className="field-error">
-                  {variantForm.formState.errors.name.message}
+                  {readFormError(variantForm.formState.errors.name.message, language)}
                 </span>
               )}
             </label>
             <label htmlFor="variant-sku">
-              SKU
+              {c.sku}
               <input
                 id="variant-sku"
                 {...variantForm.register("sku")}
-                placeholder="SKU"
+                placeholder={c.sku}
               />
               {variantForm.formState.errors.sku && (
                 <span className="field-error">
-                  {variantForm.formState.errors.sku.message}
+                  {readFormError(variantForm.formState.errors.sku.message, language)}
                 </span>
               )}
             </label>
             <label htmlFor="variant-price">
-              Price
-              <input
-                id="variant-price"
-                {...variantForm.register("price")}
-                type="number"
-                step="1"
-                placeholder="Price"
+              {c.price}
+              <Controller
+                control={variantForm.control}
+                name="price"
+                render={({ field }) => (
+                  <NumberInput
+                    id="variant-price"
+                    name={field.name}
+                    ref={field.ref}
+                    value={field.value}
+                    onBlur={field.onBlur}
+                    onValueChange={field.onChange}
+                    placeholder={c.price}
+                  />
+                )}
               />
               {variantForm.formState.errors.price && (
                 <span className="field-error">
-                  {variantForm.formState.errors.price.message}
+                  {readFormError(variantForm.formState.errors.price.message, language)}
                 </span>
               )}
             </label>
             <label htmlFor="variant-stock">
-              Stock
-              <input
-                id="variant-stock"
-                {...variantForm.register("stock")}
-                type="number"
-                step="1"
-                placeholder="Stock"
+              {c.stock}
+              <Controller
+                control={variantForm.control}
+                name="stock"
+                render={({ field }) => (
+                  <NumberInput
+                    id="variant-stock"
+                    name={field.name}
+                    ref={field.ref}
+                    value={field.value}
+                    onBlur={field.onBlur}
+                    onValueChange={field.onChange}
+                    placeholder={c.stock}
+                  />
+                )}
               />
               {variantForm.formState.errors.stock && (
                 <span className="field-error">
-                  {variantForm.formState.errors.stock.message}
+                  {readFormError(variantForm.formState.errors.stock.message, language)}
                 </span>
               )}
             </label>
@@ -826,16 +1127,18 @@ export function CatalogPage() {
               type="submit"
               disabled={createVariant.isPending}
             >
-              <Tags size={17} /> Add variant
+              <Tags size={17} /> {c.addVariant}
             </button>
           </form>
           <ImageAttachForm
             products={products}
             isPending={addImage.isPending}
+            language={language}
+            c={c}
             onAdd={(productId, url) => addImage.mutateAsync({ productId, url })}
           />
         </Panel>
-        <Panel title="Create category" eyebrow="organization">
+        <Panel title={c.createCategory} eyebrow={c.organization}>
           <form
             className="control-form"
             onSubmit={categoryForm.handleSubmit((values) =>
@@ -843,56 +1146,64 @@ export function CatalogPage() {
             )}
           >
             <label htmlFor="category-name">
-              Category name
+              {c.categoryName}
               <input
                 id="category-name"
                 {...categoryForm.register("name")}
-                placeholder="Category name"
+                placeholder={c.categoryName}
               />
               {categoryForm.formState.errors.name && (
                 <span className="field-error">
-                  {categoryForm.formState.errors.name.message}
+                  {readFormError(categoryForm.formState.errors.name.message, language)}
                 </span>
               )}
             </label>
             <label htmlFor="category-slug">
-              Slug
+              {c.slug}
               <input
                 id="category-slug"
                 {...categoryForm.register("slug")}
-                placeholder="Slug"
+                placeholder={c.slug}
               />
               {categoryForm.formState.errors.slug && (
                 <span className="field-error">
-                  {categoryForm.formState.errors.slug.message}
+                  {readFormError(categoryForm.formState.errors.slug.message, language)}
                 </span>
               )}
             </label>
             <label htmlFor="category-icon">
-              Icon
+              {c.icon}
               <input
                 id="category-icon"
                 {...categoryForm.register("icon")}
-                placeholder="Icon"
+                placeholder={c.icon}
               />
               {categoryForm.formState.errors.icon && (
                 <span className="field-error">
-                  {categoryForm.formState.errors.icon.message}
+                  {readFormError(categoryForm.formState.errors.icon.message, language)}
                 </span>
               )}
             </label>
             <label htmlFor="category-sortOrder">
-              Sort order
-              <input
-                id="category-sortOrder"
-                {...categoryForm.register("sortOrder")}
-                type="number"
-                step="1"
-                placeholder="Sort order"
+              {c.sortOrder}
+              <Controller
+                control={categoryForm.control}
+                name="sortOrder"
+                render={({ field }) => (
+                  <NumberInput
+                    id="category-sortOrder"
+                    name={field.name}
+                    ref={field.ref}
+                    value={field.value}
+                    onBlur={field.onBlur}
+                    onValueChange={field.onChange}
+                    placeholder={c.sortOrder}
+                  />
+                )}
               />
               {categoryForm.formState.errors.sortOrder && (
                 <span className="field-error">
-                  {categoryForm.formState.errors.sortOrder.message}
+                  {readFormError(categoryForm.formState.errors.sortOrder.message, language)}
                 </span>
               )}
             </label>
@@ -901,7 +1212,7 @@ export function CatalogPage() {
               type="submit"
               disabled={createCategory.isPending}
             >
-              <Tags size={17} /> Create category
+              <Tags size={17} /> {c.createCategory}
             </button>
           </form>
         </Panel>
@@ -915,6 +1226,7 @@ function ProductImageGallery({
   loading,
   disabled,
   deletingImageId,
+  c,
   onDelete,
   onReorder,
 }: {
@@ -922,11 +1234,12 @@ function ProductImageGallery({
   loading: boolean;
   disabled: boolean;
   deletingImageId?: string;
+  c: CatalogCopy;
   onDelete: (productId: string, imageId: string) => void;
   onReorder: (productId: string, images: { id: string; sortOrder: number }[]) => void;
 }) {
   if (loading) {
-    return <p className="image-gallery-empty">Loading product images…</p>;
+    return <p className="image-gallery-empty">{c.loadingProductImages}</p>;
   }
   if (!product) return null;
 
@@ -949,28 +1262,28 @@ function ProductImageGallery({
   };
 
   return (
-    <section className="product-image-gallery" aria-label="Product image gallery">
+    <section className="product-image-gallery" aria-label={c.imageGallery}>
       <div className="product-image-gallery-heading">
-        <strong>Image gallery</strong>
-        <span>First image is used as the storefront primary image.</span>
+        <strong>{c.imageGallery}</strong>
+        <span>{c.imageGalleryHelp}</span>
       </div>
       {images.length === 0 ? (
-        <p className="image-gallery-empty">No images attached yet.</p>
+        <p className="image-gallery-empty">{c.noImages}</p>
       ) : (
         <div className="image-gallery-list">
           {images.map((image, index) => (
             <article key={image.id} className="image-gallery-card">
               <img src={normalizeAssetUrl(image.url)} alt="" loading="lazy" />
               <div>
-                <strong>{index === 0 ? "Primary image" : `Image ${index + 1}`}</strong>
+                <strong>{index === 0 ? c.primaryImage : c.imageNumber(index + 1)}</strong>
                 <span title={image.url}>{image.url}</span>
               </div>
               <div className="image-gallery-actions">
                 <button
                   className="icon-button"
                   type="button"
-                  aria-label="Set image as primary"
-                  title="Set primary"
+                  aria-label={c.setImagePrimary}
+                  title={c.setPrimary}
                   disabled={disabled || index === 0}
                   onClick={() => applyOrder([image, ...images.filter((item) => item.id !== image.id)])}
                 >
@@ -979,8 +1292,8 @@ function ProductImageGallery({
                 <button
                   className="icon-button"
                   type="button"
-                  aria-label="Move image up"
-                  title="Move up"
+                  aria-label={c.moveImageUp}
+                  title={c.moveUp}
                   disabled={disabled || index === 0}
                   onClick={() => move(index, -1)}
                 >
@@ -989,8 +1302,8 @@ function ProductImageGallery({
                 <button
                   className="icon-button"
                   type="button"
-                  aria-label="Move image down"
-                  title="Move down"
+                  aria-label={c.moveImageDown}
+                  title={c.moveDown}
                   disabled={disabled || index === images.length - 1}
                   onClick={() => move(index, 1)}
                 >
@@ -999,11 +1312,11 @@ function ProductImageGallery({
                 <button
                   className="icon-button icon-button-danger"
                   type="button"
-                  aria-label="Delete image"
-                  title="Delete image"
+                  aria-label={c.deleteImage}
+                  title={c.deleteImage}
                   disabled={disabled || deletingImageId === image.id}
                   onClick={() => {
-                    if (window.confirm("Delete this product image?")) {
+                    if (window.confirm(c.deleteImageConfirm)) {
                       onDelete(product.id, image.id);
                     }
                   }}
@@ -1021,10 +1334,14 @@ function ProductImageGallery({
 
 function ProductMerchandisingCell({
   product,
+  language,
+  c,
   disabled,
   onUpdate,
 }: {
   product: Product;
+  language: Language;
+  c: CatalogCopy;
   disabled: boolean;
   onUpdate: (values: {
     isFeatured?: boolean;
@@ -1035,31 +1352,35 @@ function ProductMerchandisingCell({
   const flashActive = isFlashSaleActive(product);
   const flashExpired = product.isFlashSale && !flashActive;
   const flashStatus = !product.isFlashSale
-    ? "Off"
+    ? c.off
     : flashExpired
-      ? "Expired"
-      : "Live";
+      ? c.expired
+      : c.live;
   const flashTone = !product.isFlashSale
     ? "neutral"
     : flashExpired
       ? "danger"
       : "warn";
   const flashDetail = product.isFlashSale
-    ? `${flashExpired ? "Expired" : "Ends"} ${formatFlashSaleEnd(product.flashSaleEndsAt)}`
-    : "Start a 7-day flash window";
+    ? `${flashExpired ? c.flashExpired : c.flashEnds} ${formatFlashSaleEnd(
+        product.flashSaleEndsAt,
+        language,
+        c,
+      )}`
+    : c.startFlashWindow;
   const flashActionLabel = product.isFlashSale
     ? flashExpired
-      ? "Renew 7d"
-      : "End"
-    : "Start 7d";
+      ? c.renew7d
+      : c.end
+    : c.start7d;
 
   return (
     <div className="merch-cell">
       <div className="merch-row">
         <span className="merch-state">
-          <strong>Featured</strong>
+          <strong>{c.featured}</strong>
           <Badge tone={product.isFeatured ? "hot" : "neutral"}>
-            {product.isFeatured ? "On" : "Off"}
+            {product.isFeatured ? c.on : c.off}
           </Badge>
         </span>
         <button
@@ -1068,12 +1389,12 @@ function ProductMerchandisingCell({
           disabled={disabled}
           onClick={() => onUpdate({ isFeatured: !product.isFeatured })}
         >
-          {product.isFeatured ? "Hide" : "Show"}
+          {product.isFeatured ? c.hide : c.show}
         </button>
       </div>
       <div className="merch-row">
         <span className="merch-state">
-          <strong>Flash</strong>
+          <strong>{c.flash}</strong>
           <Badge tone={flashTone}>{flashStatus}</Badge>
         </span>
         <button
@@ -1097,9 +1418,9 @@ function ProductMerchandisingCell({
   );
 }
 
-function StockCell({ product }: { product: Product }) {
+function StockCell({ product, c }: { product: Product; c: CatalogCopy }) {
   const variants = product.variants ?? [];
-  if (variants.length === 0) return <Badge tone="neutral">No variants</Badge>;
+  if (variants.length === 0) return <Badge tone="neutral">{c.noVariants}</Badge>;
 
   const totalStock = variants.reduce((sum, variant) => sum + variant.stock, 0);
   const tone = totalStock <= 0 ? "danger" : totalStock <= 10 ? "warn" : "good";
@@ -1110,17 +1431,25 @@ function StockCell({ product }: { product: Product }) {
 
   return (
     <div className="stock-cell">
-      <Badge tone={tone}>{totalStock <= 0 ? "Out" : `${totalStock} stock`}</Badge>
-      <span>{variants.length} variants · min {lowest}</span>
+      <Badge tone={tone}>{totalStock <= 0 ? c.out : c.stockCount(totalStock)}</Badge>
+      <span>{c.variantsMin(variants.length, lowest)}</span>
     </div>
   );
 }
 
-function AssetPreview({ value, label }: { value?: string; label: string }) {
+function AssetPreview({
+  value,
+  label,
+  c,
+}: {
+  value?: string;
+  label: string;
+  c: CatalogCopy;
+}) {
   const trimmed = value?.trim() ?? "";
   if (!trimmed) return null;
   if (!isAssetUrl(trimmed)) {
-    return <span className="field-hint">Preview appears after a valid asset URL.</span>;
+    return <span className="field-hint">{c.previewHint}</span>;
   }
 
   return (
@@ -1182,11 +1511,15 @@ function toIsoDateTime(value?: string | null) {
   return Number.isNaN(time) ? undefined : new Date(time).toISOString();
 }
 
-function formatFlashSaleEnd(value?: string | null) {
-  if (!value) return "no end date";
+function formatFlashSaleEnd(
+  value: string | null | undefined,
+  language: Language,
+  c: CatalogCopy,
+) {
+  if (!value) return c.noEndDate;
   const time = Date.parse(value);
-  if (Number.isNaN(time)) return "invalid date";
-  return new Intl.DateTimeFormat("id-ID", {
+  if (Number.isNaN(time)) return c.invalidDate;
+  return new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-US", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(time);
@@ -1195,10 +1528,14 @@ function formatFlashSaleEnd(value?: string | null) {
 function ImageAttachForm({
   products,
   isPending,
+  language,
+  c,
   onAdd,
 }: {
   products: Product[];
   isPending: boolean;
+  language: Language;
+  c: CatalogCopy;
   onAdd: (productId: string, url: string) => Promise<ProductImage | undefined>;
 }) {
   const form = useForm<ImageFormInput, unknown, ImageForm>({
@@ -1218,13 +1555,13 @@ function ImageAttachForm({
             // Mutation onError already surfaces the API message.
           }
         },
-        () => toast.error("Select a product and enter a valid image URL"),
+        () => toast.error(c.invalidImageForm),
       )}
     >
       <label htmlFor="image-productId">
-        Image target
+        {c.imageTarget}
         <select id="image-productId" {...form.register("productId")}>
-          <option value="">Image target</option>
+          <option value="">{c.imageTarget}</option>
           {products.map((product) => (
             <option key={product.id} value={product.id}>
               {product.name}
@@ -1233,26 +1570,35 @@ function ImageAttachForm({
         </select>
         {form.formState.errors.productId && (
           <span className="field-error">
-            {form.formState.errors.productId.message}
+            {readFormError(form.formState.errors.productId.message, language)}
           </span>
         )}
       </label>
       <label htmlFor="image-url">
-        Image URL
+        {c.imageUrl}
         <input
           id="image-url"
           {...form.register("url")}
-          placeholder="Image URL"
+          placeholder={c.imageUrl}
+        />
+        <ImageUploadButton
+          disabled={isPending}
+          onUploaded={(url) =>
+            form.setValue("url", url, {
+              shouldDirty: true,
+              shouldValidate: true,
+            })
+          }
         />
         {form.formState.errors.url && (
           <span className="field-error">
-            {form.formState.errors.url.message}
+            {readFormError(form.formState.errors.url.message, language)}
           </span>
         )}
-        <AssetPreview value={imageUrl} label="Attached image preview" />
+        <AssetPreview value={imageUrl} label={c.attachedImagePreview} c={c} />
       </label>
       <button className="ghost-button" type="submit" disabled={isPending}>
-        <ImagePlus size={16} /> Attach image
+        <ImagePlus size={16} /> {c.attachImage}
       </button>
     </form>
   );

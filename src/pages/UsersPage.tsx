@@ -8,12 +8,73 @@ import { ErrorState } from "../components/ErrorState";
 import { LoadingState } from "../components/LoadingState";
 import { Panel } from "../components/Panel";
 import { useAuth, useToken } from "../context/AuthContext";
+import { useI18n, type Language } from "../context/I18nContext";
 import { request } from "../lib/api";
 import { readError, shortDate } from "../lib/format";
-import type { Paginated, User } from "../types";
+import type { Paginated, User, UserRole } from "../types";
+
+type UsersCopy = {
+  updated: string;
+  title: string;
+  eyebrow: string;
+  searchLabel: string;
+  searchPlaceholder: string;
+  tableCaption: string;
+  columns: string[];
+  active: string;
+  disabled: string;
+  protectedAria: (email: string) => string;
+  toggleAria: (action: string, email: string) => string;
+  confirmDisable: (email: string) => string;
+  protectedTitle: string;
+  disable: string;
+  enable: string;
+  roles: Record<UserRole, string>;
+};
+
+const copy: Record<Language, UsersCopy> = {
+  en: {
+    updated: "User access updated",
+    title: "Customers",
+    eyebrow: "access control",
+    searchLabel: "Search users",
+    searchPlaceholder: "Search name, email, phone",
+    tableCaption: "Customer access table",
+    columns: ["Name", "Email", "Role", "Joined", "Status", "Action"],
+    active: "ACTIVE",
+    disabled: "DISABLED",
+    protectedAria: (email) => `${email} is protected`,
+    toggleAria: (action, email) => `${action} ${email}`,
+    confirmDisable: (email) => `Disable access for ${email}?`,
+    protectedTitle: "Protected",
+    disable: "Disable",
+    enable: "Enable",
+    roles: { ADMIN: "Admin", CUSTOMER: "Customer" },
+  },
+  id: {
+    updated: "Akses pengguna diperbarui",
+    title: "Pelanggan",
+    eyebrow: "kontrol akses",
+    searchLabel: "Cari pengguna",
+    searchPlaceholder: "Cari nama, email, telepon",
+    tableCaption: "Tabel akses pelanggan",
+    columns: ["Nama", "Email", "Role", "Bergabung", "Status", "Aksi"],
+    active: "ACTIVE",
+    disabled: "DISABLED",
+    protectedAria: (email) => `${email} dilindungi`,
+    toggleAria: (action, email) => `${action} ${email}`,
+    confirmDisable: (email) => `Nonaktifkan akses untuk ${email}?`,
+    protectedTitle: "Protected",
+    disable: "Disable",
+    enable: "Enable",
+    roles: { ADMIN: "Admin", CUSTOMER: "Pelanggan" },
+  },
+};
 
 export function UsersPage() {
   const token = useToken();
+  const { language } = useI18n();
+  const c = copy[language];
   const { session } = useAuth();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
@@ -42,21 +103,21 @@ export function UsersPage() {
       }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["users"] });
-      toast.success("User access updated");
+      toast.success(c.updated);
     },
-    onError: (error) => toast.error(readError(error)),
+    onError: (error) => toast.error(readError(error, language)),
   });
 
   if (usersQuery.isLoading) return <LoadingState />;
   if (usersQuery.error)
-    return <ErrorState message={readError(usersQuery.error)} />;
+    return <ErrorState message={readError(usersQuery.error, language)} />;
 
   return (
-    <Panel title="Customers" eyebrow="access control">
+    <Panel title={c.title} eyebrow={c.eyebrow}>
       <div className="toolbar">
         <Search size={18} aria-hidden="true" />
         <label className="sr-only" htmlFor="user-search">
-          Search users
+          {c.searchLabel}
         </label>
         <input
           id="user-search"
@@ -65,25 +126,25 @@ export function UsersPage() {
           autoComplete="off"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search name, email, phone"
+          placeholder={c.searchPlaceholder}
         />
       </div>
       <DataTable
-        caption="Customer access table"
-        columns={["Name", "Email", "Role", "Joined", "Status", "Action"]}
+        caption={c.tableCaption}
+        columns={c.columns}
         rows={(usersQuery.data?.data ?? []).map((user) => {
           const protectedUser =
             user.role === "ADMIN" || user.id === session?.user.id;
           return [
             user.name,
             user.email,
-            user.role,
-            shortDate(user.createdAt),
+            c.roles[user.role],
+            shortDate(user.createdAt, language),
             <Badge
               key={`${user.id}-status`}
               tone={user.isActive ? "good" : "danger"}
             >
-              {user.isActive ? "ACTIVE" : "DISABLED"}
+              {user.isActive ? c.active : c.disabled}
             </Badge>,
             <button
               key={user.id}
@@ -91,8 +152,8 @@ export function UsersPage() {
               type="button"
               aria-label={
                 protectedUser
-                  ? `${user.email} is protected`
-                  : `${user.isActive ? "Disable" : "Enable"} ${user.email}`
+                  ? c.protectedAria(user.email)
+                  : c.toggleAria(user.isActive ? c.disable : c.enable, user.email)
               }
               disabled={protectedUser || toggleMutation.isPending}
               onClick={() => {
@@ -101,7 +162,7 @@ export function UsersPage() {
                 if (protectedUser) return;
                 if (
                   user.isActive &&
-                  !window.confirm(`Disable access for ${user.email}?`)
+                  !window.confirm(c.confirmDisable(user.email))
                 ) {
                   return;
                 }
@@ -109,10 +170,10 @@ export function UsersPage() {
               }}
               title={
                 protectedUser
-                  ? "Protected"
+                  ? c.protectedTitle
                   : user.isActive
-                    ? "Disable"
-                    : "Enable"
+                    ? c.disable
+                    : c.enable
               }
             >
               {protectedUser ? (

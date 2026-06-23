@@ -334,6 +334,17 @@ code {
   background: var(--surface);
 }
 
+.login-api-target {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.login-api-target code {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
 .shell {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
@@ -517,12 +528,16 @@ code {
 
 .workspace {
   min-width: 0;
+  min-height: 100vh;
   padding: 22px 24px 28px;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 20px;
+  align-items: stretch;
 }
 
 .topbar {
+  flex: 0 0 auto;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -589,6 +604,10 @@ code {
 
 .catalog-table-panel {
   grid-column: 1 / -1;
+}
+
+.catalog-table-panel table {
+  min-width: 1240px;
 }
 
 .catalog-product-panel {
@@ -1280,6 +1299,7 @@ th {
 
 .primary-button,
 .ghost-button,
+.compact-button,
 .table-button,
 .icon-button {
   border: 1px solid var(--line);
@@ -1302,6 +1322,7 @@ th {
 
 .primary-button:hover,
 .ghost-button:hover,
+.compact-button:hover,
 .table-button:hover,
 .icon-button:hover {
   border-color: var(--line-strong);
@@ -1323,6 +1344,7 @@ th {
 
 .primary-button:disabled,
 .ghost-button:disabled,
+.compact-button:disabled,
 .table-button:disabled,
 .icon-button:disabled {
   cursor: not-allowed;
@@ -1337,6 +1359,13 @@ th {
   padding: 3px 0;
   border-radius: 6px;
   box-shadow: none;
+}
+
+.compact-button {
+  padding: 7px 10px;
+  font-size: 12px;
+  box-shadow: none;
+  white-space: nowrap;
 }
 
 .table-button:hover {
@@ -1406,16 +1435,30 @@ th {
   flex-wrap: wrap;
 }
 
+.inline-upload-control {
+  display: inline-flex;
+  margin-top: 8px;
+}
+
+.inline-upload-control .ghost-button {
+  width: fit-content;
+}
+
+.inline-upload-control input {
+  display: none;
+}
+
 .merch-cell {
   display: grid;
   gap: 6px;
   min-width: 240px;
+  max-width: 320px;
 }
 
 .merch-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -1427,17 +1470,27 @@ th {
   display: flex;
   align-items: center;
   gap: 7px;
+  min-width: 0;
   color: var(--ink);
   font-size: 12px;
   font-weight: 850;
 }
 
+.merch-state strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .merch-action-button {
   border-color: var(--line);
   background: var(--surface);
+  min-width: max-content;
   padding: 5px 9px;
   border-radius: 999px;
   line-height: 1.1;
+  white-space: nowrap;
 }
 
 .merch-action-button:hover {
@@ -1449,6 +1502,7 @@ th {
 .merch-note {
   color: var(--muted);
   font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
 .asset-preview {
@@ -1618,9 +1672,84 @@ th {
   margin: 0;
 }
 
-.asset-list article {
-  grid-template-columns: minmax(0, 1fr) auto;
+.asset-list-empty {
+  min-height: 360px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-lg);
+  display: grid;
+  place-items: center;
+  align-content: center;
+  justify-items: center;
+  gap: 8px;
+  padding: 28px;
+  color: var(--muted);
+  text-align: center;
+  background:
+    radial-gradient(
+      circle at 50% 18%,
+      oklch(95% 0.032 262 / 0.55),
+      transparent 30%
+    ),
+    var(--surface-2);
+}
+
+.asset-list-empty-icon {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid oklch(54.6% 0.215 262 / 0.16);
+  border-radius: 16px;
+  color: var(--primary);
+  background: var(--primary-soft);
+}
+
+.asset-list-empty strong {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.asset-list-empty p {
+  max-width: 36ch;
+  margin: 0;
+  font-size: 13px;
+}
+
+.asset-card {
+  grid-template-columns: 72px minmax(0, 1fr) auto;
   align-items: center;
+}
+
+.asset-card-thumb {
+  width: 72px;
+  height: 72px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  background: var(--surface-2);
+}
+
+.asset-card-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.asset-card-main strong,
+.asset-card-main code,
+.asset-card-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asset-card-main strong {
+  color: var(--ink);
+}
+
+.asset-card-main code {
+  display: block;
+  font-size: 12px;
 }
 
 .empty-inline {
@@ -1647,6 +1776,7 @@ th {
   padding: 10px;
   display: grid;
   gap: 11px;
+  min-width: 0;
   background: var(--surface);
   box-shadow: 0 1px 2px oklch(32% 0.08 260 / 0.04);
   transition:
@@ -1703,13 +1833,19 @@ th {
   align-items: flex-start;
   justify-content: space-between;
   gap: 10px;
+  min-width: 0;
 }
 
 .banner-card-heading strong {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.banner-card-heading .badge {
+  flex: 0 0 auto;
 }
 
 .banner-meta {
@@ -1761,8 +1897,90 @@ th {
     var(--surface-2);
 }
 
+.dropzone-icon {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  border: 1px solid oklch(54.6% 0.215 262 / 0.16);
+  border-radius: 20px;
+  color: var(--primary);
+  background: var(--primary-soft);
+  box-shadow: 0 8px 18px oklch(54.6% 0.215 262 / 0.1);
+}
+
 .dropzone span {
   color: var(--muted);
+}
+
+.dropzone-picker {
+  width: min(100%, 520px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  text-align: left;
+  box-shadow: 0 1px 2px oklch(32% 0.08 260 / 0.04);
+}
+
+.dropzone-file-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.dropzone-file-status > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.dropzone-file-status strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.dropzone-file-list {
+  display: grid;
+  gap: 6px;
+}
+
+.dropzone-file-list span {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  padding: 7px 9px;
+}
+
+.dropzone-file-list strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dropzone-file-list small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.dropzone-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
 }
 
 .loading-state,

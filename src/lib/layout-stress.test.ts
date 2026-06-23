@@ -70,9 +70,7 @@ describe("admin layout stress guardrails", () => {
     expect(dashboardPage).toContain("/dashboard/revenue?period=${period}");
     expect(dashboardPage).toContain("formatRevenueDate(value");
     expect(dashboardPage).toContain('period === "1y" ? "month" : "day"');
-    expect(dashboardPage).toContain(
-      'labelFormatter={(value) => formatRevenueDate(value, "full")}',
-    );
+    expect(dashboardPage).toContain('formatRevenueDate(value, "full", language)');
     expect(css).toContain(".period-toggle");
     expect(dashboardPage).toContain('height="100%"');
     expect(dashboardPage).toContain('className="hero-panel"');
@@ -172,10 +170,8 @@ describe("admin layout stress guardrails", () => {
     expect(ordersPage).toContain('className="orders-toolbar"');
     expect(ordersPage).toContain('className="pagination-strip"');
     expect(ordersPage).toContain('className="order-status-select"');
-    expect(ordersPage).toContain("Tracking number for ${order.orderNumber}");
-    expect(ordersPage).toContain(
-      "Cancellation reason for ${order.orderNumber}",
-    );
+    expect(ordersPage).toContain("c.trackingPrompt(order.orderNumber)");
+    expect(ordersPage).toContain("c.cancelReasonPrompt(order.orderNumber)");
     expect(ordersPage).toContain("reason: reason.trim() || undefined");
     expect(ordersPage).toContain("OrderDetailPanel");
     expect(ordersPage).toContain("/orders/${selectedOrderId}");
@@ -199,6 +195,9 @@ describe("admin layout stress guardrails", () => {
       /\.catalog-table-panel\s*{[^}]*grid-column:\s*1 \/ -1;/s,
     );
     expect(css).toMatch(
+      /\.catalog-table-panel table\s*{[^}]*min-width:\s*1240px;/s,
+    );
+    expect(css).toMatch(
       /\.catalog-product-panel\s*{[^}]*grid-column:\s*span 7;/s,
     );
     expect(css).toMatch(/\.catalog-side-stack\s*{[^}]*grid-column:\s*span 5;/s);
@@ -217,11 +216,23 @@ describe("admin layout stress guardrails", () => {
     );
   });
 
+  it("anchors the workspace topbar with stable content gap", () => {
+    expect(css).toMatch(/\.workspace\s*{[^}]*display:\s*flex;/s);
+    expect(css).toMatch(/\.workspace\s*{[^}]*flex-direction:\s*column;/s);
+    expect(css).toMatch(/\.workspace\s*{[^}]*gap:\s*20px;/s);
+    expect(css).toMatch(/\.topbar\s*{[^}]*flex:\s*0 0 auto;/s);
+  });
+
   it("keeps banner previews stable and truncates long metadata", () => {
     expect(css).toMatch(/\.banner-wall\s*{[^}]*minmax\(280px, 1fr\)/s);
     expect(css).toMatch(/\.banner-media\s*{[^}]*aspect-ratio:\s*16 \/ 9;/s);
+    expect(css).toMatch(/\.banner-card\s*{[^}]*min-width:\s*0;/s);
+    expect(css).toMatch(/\.banner-card-heading\s*{[^}]*min-width:\s*0;/s);
     expect(css).toMatch(
       /\.banner-card-heading strong\s*{[^}]*text-overflow:\s*ellipsis;/s,
+    );
+    expect(css).toMatch(
+      /\.banner-card-heading \.badge\s*{[^}]*flex:\s*0 0 auto;/s,
     );
     expect(css).toMatch(/\.banner-meta span\s*{[^}]*white-space:\s*nowrap;/s);
   });
@@ -230,7 +241,7 @@ describe("admin layout stress guardrails", () => {
     expect(bannersPage).toContain("useState<Banner | null>");
     expect(bannersPage).toContain("startEditingBanner(banner)");
     expect(bannersPage).toContain(
-      'title={editingBanner ? "Edit banner" : "Create banner"}',
+      "title={editingBanner ? c.formTitleEdit : c.formTitleCreate}",
     );
     expect(bannersPage).toContain("request<Banner>(`/banners/${id}`");
     expect(bannersPage).toContain("Cancel edit");
@@ -241,12 +252,20 @@ describe("admin layout stress guardrails", () => {
     expect(catalogPage).toContain('productForm.register("isFeatured")');
     expect(catalogPage).toContain('productForm.register("isFlashSale")');
     expect(catalogPage).toContain('productForm.register("flashSaleEndsAt")');
-    expect(catalogPage).toContain("Home sections");
-    expect(catalogPage).toContain("<strong>Featured</strong>");
-    expect(catalogPage).toContain("<strong>Flash sale</strong>");
+    expect(catalogPage).toContain("homeSections:");
+    expect(catalogPage).toContain("featured:");
+    expect(catalogPage).toContain("flashSale:");
     expect(catalogPage).toContain("request<Product>(`/products/${id}`");
     expect(css).toMatch(/\.merch-cell\s*{[^}]*min-width:\s*240px;/s);
+    expect(css).toMatch(/\.merch-cell\s*{[^}]*max-width:\s*320px;/s);
     expect(css).toContain(".merch-row");
+    expect(css).toMatch(
+      /\.merch-row\s*{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) auto;/s,
+    );
+    expect(css).toMatch(/\.merch-state\s*{[^}]*min-width:\s*0;/s);
+    expect(css).toMatch(
+      /\.merch-action-button\s*{[^}]*white-space:\s*nowrap;/s,
+    );
     expect(css).toContain(".merch-form-panel");
   });
 
@@ -269,10 +288,10 @@ describe("admin layout stress guardrails", () => {
     expect(catalogPage).toContain("useState<Product | null>");
     expect(catalogPage).toContain("startEditingProduct(product)");
     expect(catalogPage).toContain(
-      'title={editingProduct ? "Edit product" : "Create product"}',
+      "title={editingProduct ? c.editProduct(editingProduct.name) : c.createProduct}",
     );
     expect(catalogPage).toContain("request<Product>(`/products/${id}`");
-    expect(catalogPage).toContain("Cancel edit");
+    expect(catalogPage).toContain("c.cancelEdit");
   });
 
   it("keeps broadcast submit action aligned with the form", () => {
@@ -286,9 +305,9 @@ describe("admin layout stress guardrails", () => {
     expect(vouchersPage).toContain("request<Voucher>(`/vouchers/${id}`");
     expect(vouchersPage).toContain('method: "DELETE"');
     expect(vouchersPage).toContain(
-      'aria-label={`${voucher.isActive ? "Disable" : "Enable"} voucher ${voucher.code}`}',
+      'aria-label={`${voucher.isActive ? c.disable : c.enable} ${c.voucherLabel} ${voucher.code}`}',
     );
-    expect(vouchersPage).toContain("Cancel edit");
+    expect(vouchersPage).toContain("c.cancel");
   });
 
   it("marks destructive web actions with destructive button styling", () => {

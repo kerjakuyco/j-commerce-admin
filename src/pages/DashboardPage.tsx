@@ -41,7 +41,7 @@ type DashboardPeriod = (typeof dashboardPeriods)[number];
 
 export function DashboardPage() {
   const token = useToken();
-  const { t } = useI18n();
+  const { language, t } = useI18n();
   const [period, setPeriod] = useState<DashboardPeriod>("30d");
   const [statsQuery, revenueQuery, topQuery, statusQuery, alertsQuery] =
     useQueries({
@@ -90,6 +90,7 @@ export function DashboardPage() {
   const topProducts = topQuery.data ?? [];
   const breakdown = statusQuery.data ?? [];
   const alerts = alertsQuery.data ?? [];
+  const alertLabels = t.dashboard.alertLabels as Record<string, string>;
 
   return (
     <div className="dashboard-grid">
@@ -107,18 +108,18 @@ export function DashboardPage() {
         </ul>
       </Panel>
       <Panel
-        title="Operations alerts"
-        eyebrow="needs attention"
+        title={t.dashboard.operationsAlerts}
+        eyebrow={t.dashboard.needsAttention}
         className="dashboard-alerts-panel"
       >
         {alertsQuery.error ? (
           <p className="field-error">
-            Alerts unavailable: {readError(alertsQuery.error)}
+            {t.dashboard.alertsUnavailable}: {readError(alertsQuery.error, language)}
           </p>
         ) : alertsQuery.isLoading ? (
-          <p className="panel-empty-state">Loading alerts...</p>
+          <p className="panel-empty-state">{t.dashboard.loadingAlerts}</p>
         ) : alerts.length === 0 ? (
-          <p className="panel-empty-state">No alerts available.</p>
+          <p className="panel-empty-state">{t.dashboard.noAlerts}</p>
         ) : (
           <div className="dashboard-alert-list">
             {alerts.map((alert) => (
@@ -128,12 +129,14 @@ export function DashboardPage() {
                 className="dashboard-alert-link"
               >
                 <span>
-                  <strong>{alert.label}</strong>
+                  <strong>{alertLabels[alert.id] ?? alert.label}</strong>
                   <small>
-                    {alert.count === 0 ? "Clear" : "Open related work"}
+                    {alert.count === 0
+                      ? t.dashboard.alertClear
+                      : t.dashboard.alertOpenRelated}
                   </small>
                 </span>
-                <Badge tone={alert.tone}>{number(alert.count)}</Badge>
+                <Badge tone={alert.tone}>{number(alert.count, language)}</Badge>
               </Link>
             ))}
           </div>
@@ -146,29 +149,30 @@ export function DashboardPage() {
             value={money(stats.totalRevenue)}
             detail={growthLabel(
               stats.revenueGrowthPercent,
-              "vs previous month",
+              t.dashboard.revenueGrowthSuffix,
+              language,
             )}
           />
           <StatCard
             label={t.dashboard.orders}
-            value={number(stats.totalOrders)}
+            value={number(stats.totalOrders, language)}
             detail={t.dashboard.orderGrowth(stats.orderGrowthPercent)}
           />
           <StatCard
             label={t.dashboard.customers}
-            value={number(stats.totalCustomers)}
+            value={number(stats.totalCustomers, language)}
             detail={t.dashboard.customersDetail}
           />
           <StatCard
             label={t.dashboard.products}
-            value={number(stats.totalProducts)}
+            value={number(stats.totalProducts, language)}
             detail={t.dashboard.productsDetail}
           />
         </div>
       ) : statsQuery.error ? (
         // Per-panel gating: a stats failure no longer blanks the whole page.
         <p className="field-error">
-          {t.dashboard.statsUnavailable}: {readError(statsQuery.error)}
+          {t.dashboard.statsUnavailable}: {readError(statsQuery.error, language)}
         </p>
       ) : null}
       <Panel
@@ -178,7 +182,7 @@ export function DashboardPage() {
       >
         {statusQuery.error ? (
           <p className="field-error">
-            {t.dashboard.orderStatusUnavailable}: {readError(statusQuery.error)}
+            {t.dashboard.orderStatusUnavailable}: {readError(statusQuery.error, language)}
           </p>
         ) : (
           <div className="dashboard-status-content">
@@ -216,12 +220,14 @@ export function DashboardPage() {
             </div>
             <div
               className="status-drill-list"
-              aria-label="Order status drill-downs"
+              aria-label={t.dashboard.orderStatusDrilldowns}
             >
               {breakdown.map((item) => (
                 <Link key={item.status} to={`/orders?status=${item.status}`}>
-                  <Badge tone={orderTone(item.status)}>{item.status}</Badge>
-                  <span>{number(item.count)} orders</span>
+                  <Badge tone={orderTone(item.status)}>
+                    {t.dashboard.statusLabels[item.status]}
+                  </Badge>
+                  <span>{t.dashboard.orderCount(number(item.count, language))}</span>
                 </Link>
               ))}
             </div>
@@ -229,8 +235,8 @@ export function DashboardPage() {
         )}
       </Panel>
       <Panel
-        title="Recent orders"
-        eyebrow="latest activity"
+        title={t.dashboard.recentOrders}
+        eyebrow={t.dashboard.latestActivity}
         className="dashboard-recent-orders-panel"
       >
         {stats?.recentOrders?.length ? (
@@ -242,15 +248,17 @@ export function DashboardPage() {
                   <small>
                     {order.user?.name ??
                       order.user?.email ??
-                      "Customer unavailable"}
+                      t.dashboard.customerUnavailable}
                   </small>
                 </span>
-                <Badge tone={orderTone(order.status)}>{order.status}</Badge>
+                <Badge tone={orderTone(order.status)}>
+                  {t.dashboard.statusLabels[order.status]}
+                </Badge>
               </Link>
             ))}
           </div>
         ) : (
-          <p className="panel-empty-state">No recent orders yet.</p>
+          <p className="panel-empty-state">{t.dashboard.noRecentOrders}</p>
         )}
       </Panel>
       <Panel
@@ -260,7 +268,7 @@ export function DashboardPage() {
       >
         {topQuery.error ? (
           <p className="field-error">
-            {t.dashboard.topUnavailable}: {readError(topQuery.error)}
+            {t.dashboard.topUnavailable}: {readError(topQuery.error, language)}
           </p>
         ) : (
           <div className="stack-list">
@@ -278,7 +286,7 @@ export function DashboardPage() {
                     {item.product?.name ?? t.dashboard.unknownProduct}
                   </strong>
                   <span>
-                    {number(item.totalSold)} {t.dashboard.sold} ·{" "}
+                    {number(item.totalSold, language)} {t.dashboard.sold} ·{" "}
                     {money(item.revenue)}
                   </span>
                 </Link>
@@ -289,10 +297,10 @@ export function DashboardPage() {
       </Panel>
       <Panel
         title={t.dashboard.revenueTrend}
-        eyebrow={`Revenue period: ${period}`}
+        eyebrow={t.dashboard.revenuePeriod(period)}
         className="dashboard-revenue-panel chart-panel"
       >
-        <div className="period-toggle" aria-label="Revenue period">
+        <div className="period-toggle" aria-label={t.dashboard.revenuePeriodLabel}>
           {dashboardPeriods.map((option) => (
             <button
               key={option}
@@ -306,7 +314,7 @@ export function DashboardPage() {
         </div>
         {revenueQuery.error ? (
           <p className="field-error">
-            {t.dashboard.revenueUnavailable}: {readError(revenueQuery.error)}
+            {t.dashboard.revenueUnavailable}: {readError(revenueQuery.error, language)}
           </p>
         ) : (
           <div className="chart-box">
@@ -334,7 +342,11 @@ export function DashboardPage() {
                   dataKey="date"
                   stroke={chartMuted}
                   tickFormatter={(value) =>
-                    formatRevenueDate(value, period === "1y" ? "month" : "day")
+                    formatRevenueDate(
+                      value,
+                      period === "1y" ? "month" : "day",
+                      language,
+                    )
                   }
                   tickLine={false}
                   axisLine={false}
@@ -348,7 +360,9 @@ export function DashboardPage() {
                 />
                 <Tooltip
                   contentStyle={tooltipStyle}
-                  labelFormatter={(value) => formatRevenueDate(value, "full")}
+                  labelFormatter={(value) =>
+                    formatRevenueDate(value, "full", language)
+                  }
                 />
                 <Area
                   type="monotone"
@@ -366,25 +380,30 @@ export function DashboardPage() {
   );
 }
 
-function growthLabel(value: number | undefined, suffix: string) {
+function growthLabel(value: number | undefined, suffix: string, language: "en" | "id") {
   if (value === undefined) return suffix;
   const sign = value > 0 ? "+" : "";
-  return `${sign}${number(value)}% ${suffix}`;
+  return `${sign}${number(value, language)}% ${suffix}`;
 }
 
-function formatRevenueDate(value: unknown, style: "day" | "month" | "full") {
+function formatRevenueDate(
+  value: unknown,
+  style: "day" | "month" | "full",
+  language: "en" | "id",
+) {
   const raw = String(value);
   const date = new Date(`${raw}T00:00:00`);
   if (Number.isNaN(date.getTime())) return raw;
+  const locale = language === "id" ? "id-ID" : "en-US";
 
   if (style === "month") {
-    return new Intl.DateTimeFormat("en-US", {
+    return new Intl.DateTimeFormat(locale, {
       month: "short",
       year: "numeric",
     }).format(date);
   }
 
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat(locale, {
     month: "short",
     day: "numeric",
     year: style === "full" ? "numeric" : undefined,
