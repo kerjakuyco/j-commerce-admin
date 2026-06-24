@@ -1,10 +1,11 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { Radio } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Panel } from "../components/Panel";
+import { SelectMenu } from "../components/SelectMenu";
 import { useToken } from "../context/AuthContext";
 import { useI18n, type Language } from "../context/I18nContext";
 import { notificationTypes } from "../lib/constants";
@@ -113,11 +114,21 @@ export function NotificationsPage() {
         >
           <label htmlFor="notification-type">
             {c.type}
-            <select id="notification-type" {...form.register("type")}>
-              {notificationTypes.map((type: NotificationType) => (
-                <option key={type} value={type}>{c.typeLabels[type]}</option>
-              ))}
-            </select>
+            <Controller
+              control={form.control}
+              name="type"
+              render={({ field }) => (
+                <SelectMenu
+                  id="notification-type"
+                  value={field.value}
+                  options={notificationTypes.map((type: NotificationType) => ({
+                    value: type,
+                    label: c.typeLabels[type],
+                  }))}
+                  onChange={(value) => field.onChange(value as NotificationType)}
+                />
+              )}
+            />
             {form.formState.errors.type && (
               <span className="field-error">
                 {readFormError(form.formState.errors.type.message, language)}

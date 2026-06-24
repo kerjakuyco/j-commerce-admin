@@ -1,4 +1,10 @@
-import type { NotificationType, OrderStatus, VoucherType } from "../types";
+import type {
+  NotificationType,
+  OrderStatus,
+  PaymentStatus,
+  ShippingMethod,
+  VoucherType,
+} from "../types";
 
 export const orderStatuses: OrderStatus[] = [
   "PENDING",
@@ -17,6 +23,28 @@ const allOrderStatuses: readonly OrderStatus[] = [
 // order status <select> onChange) to OrderStatus.
 export function isOrderStatus(value: string): value is OrderStatus {
   return (allOrderStatuses as readonly string[]).includes(value);
+}
+
+export const paymentStatuses: PaymentStatus[] = [
+  "UNPAID",
+  "PAID",
+  "REFUNDED",
+  "FAILED",
+  "EXPIRED",
+];
+
+export function isPaymentStatus(value: string): value is PaymentStatus {
+  return (paymentStatuses as readonly string[]).includes(value);
+}
+
+export const shippingMethods: ShippingMethod[] = [
+  "REGULAR",
+  "EXPRESS",
+  "SAME_DAY",
+];
+
+export function isShippingMethod(value: string): value is ShippingMethod {
+  return (shippingMethods as readonly string[]).includes(value);
 }
 
 export const allowedStatusTransitions: Record<OrderStatus, OrderStatus[]> = {

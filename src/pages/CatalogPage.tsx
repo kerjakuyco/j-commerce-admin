@@ -6,6 +6,7 @@ import {
   ImagePlus,
   PackagePlus,
   Pencil,
+  Search,
   Star,
   Tags,
   Trash2,
@@ -21,7 +22,9 @@ import { ErrorState } from "../components/ErrorState";
 import { ImageUploadButton } from "../components/ImageUploadButton";
 import { LoadingState } from "../components/LoadingState";
 import { NumberInput } from "../components/NumberInput";
+import { PaginationStrip } from "../components/PaginationStrip";
 import { Panel } from "../components/Panel";
+import { SelectMenu } from "../components/SelectMenu";
 import { useToken } from "../context/AuthContext";
 import { useI18n, type Language } from "../context/I18nContext";
 import { request } from "../lib/api";
@@ -138,6 +141,8 @@ const emptyProductForm: ProductFormInput = {
   isFlashSale: false,
   flashSaleEndsAt: "",
 };
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+const DEFAULT_PAGE_SIZE = 25;
 const catalogSorts = ["newest", "price_asc", "price_desc", "rating", "sold"] as const;
 type CatalogSort = (typeof catalogSorts)[number];
 
@@ -161,7 +166,7 @@ const copy = {
     imageOrderUpdated: "Urutan gambar diperbarui",
     invalidImageForm: "Select a product and enter a valid image URL",
     productCatalog: "Product catalog",
-    skus: (count: number) => `${count} SKUs`,
+    productsCount: (count: number) => `${count} ${count === 1 ? "product" : "products"}`,
     filtersLabel: "Catalog filters",
     search: "Search",
     searchPlaceholder: "Name, brand, description",
@@ -169,6 +174,11 @@ const copy = {
     allCategories: "All categories",
     sort: "Sort",
     reset: "Reset",
+    paginationLabel: "Product catalog pagination",
+    rowsPerPage: "Rows per page",
+    previous: "Previous",
+    next: "Next",
+    pageOf: (page: number, totalPages: number) => `Page ${page} of ${totalPages}`,
     tableCaption: "Product catalog table",
     tableColumns: [
       "Product",
@@ -283,7 +293,7 @@ const copy = {
     imageOrderUpdated: "Image order updated",
     invalidImageForm: "Pilih produk dan masukkan URL gambar yang valid",
     productCatalog: "Katalog produk",
-    skus: (count: number) => `${count} SKU`,
+    productsCount: (count: number) => `${count} produk`,
     filtersLabel: "Filter katalog",
     search: "Cari",
     searchPlaceholder: "Nama, brand, deskripsi",
@@ -291,6 +301,11 @@ const copy = {
     allCategories: "Semua kategori",
     sort: "Urutkan",
     reset: "Reset",
+    paginationLabel: "Pagination katalog produk",
+    rowsPerPage: "Baris per halaman",
+    previous: "Sebelumnya",
+    next: "Berikutnya",
+    pageOf: (page: number, totalPages: number) => `Halaman ${page} dari ${totalPages}`,
     tableCaption: "Tabel katalog produk",
     tableColumns: [
       "Produk",
@@ -398,21 +413,32 @@ export function CatalogPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const searchFromUrl = searchParams.get("search") ?? "";
   const categoryFromUrl = searchParams.get("categoryId") ?? "";
+  const pageParam = Number(searchParams.get("page") ?? "1");
+  const pageSizeParam = Number(searchParams.get("limit") ?? String(DEFAULT_PAGE_SIZE));
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const catalogSearch = searchFromUrl;
   const catalogCategoryId = categoryFromUrl;
+  const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1;
+  const pageSize = PAGE_SIZE_OPTIONS.includes(pageSizeParam)
+    ? pageSizeParam
+    : DEFAULT_PAGE_SIZE;
   const [catalogSort, setCatalogSort] = useState<CatalogSort>("newest");
   const setCatalogParam = (key: string, value: string) => {
     const next = new URLSearchParams(searchParams);
     if (value) next.set(key, value);
     else next.delete(key);
+    next.set("page", "1");
     setSearchParams(next);
   };
-  const productQuery = new URLSearchParams({ limit: "80", sort: catalogSort });
+  const productQuery = new URLSearchParams({
+    limit: String(pageSize),
+    page: String(page),
+    sort: catalogSort,
+  });
   if (catalogSearch.trim()) productQuery.set("search", catalogSearch.trim());
   if (catalogCategoryId) productQuery.set("categoryId", catalogCategoryId);
   const productsQuery = useQuery({
-    queryKey: ["products", catalogSearch.trim(), catalogCategoryId, catalogSort],
+    queryKey: ["products", catalogSearch.trim(), catalogCategoryId, catalogSort, page, pageSize],
     queryFn: ({ signal }) =>
       request<Paginated<Product>>(`/products?${productQuery.toString()}`, {
         token,
@@ -682,48 +708,55 @@ export function CatalogPage() {
     <div className="catalog-layout">
       <Panel
         title={c.productCatalog}
-        eyebrow={c.skus(products.length)}
+        eyebrow={c.inventory}
+        headerMeta={c.productsCount(productsQuery.data?.meta.total ?? products.length)}
         className="catalog-table-panel"
       >
         <div className="catalog-toolbar" aria-label={c.filtersLabel}>
           <label htmlFor="catalog-search">
             {c.search}
-            <input
-              id="catalog-search"
-              value={catalogSearch}
-              onChange={(event) => setCatalogParam("search", event.target.value)}
-              placeholder={c.searchPlaceholder}
-              type="search"
-            />
+            <span className="filter-input-with-icon">
+              <Search size={16} aria-hidden="true" />
+              <input
+                id="catalog-search"
+                value={catalogSearch}
+                onChange={(event) => setCatalogParam("search", event.target.value)}
+                placeholder={c.searchPlaceholder}
+                type="search"
+              />
+            </span>
           </label>
           <label htmlFor="catalog-category-filter">
             {c.category}
-            <select
+            <SelectMenu
               id="catalog-category-filter"
               value={catalogCategoryId}
-              onChange={(event) => setCatalogParam("categoryId", event.target.value)}
-            >
-              <option value="">{c.allCategories}</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
+              options={[
+                { value: "", label: c.allCategories },
+                ...categories.map((category) => ({
+                  value: category.id,
+                  label: category.name,
+                })),
+              ]}
+              onChange={(value) => setCatalogParam("categoryId", value)}
+            />
           </label>
           <label htmlFor="catalog-sort">
             {c.sort}
-            <select
+            <SelectMenu
               id="catalog-sort"
               value={catalogSort}
-              onChange={(event) => setCatalogSort(event.target.value as CatalogSort)}
-            >
-              {catalogSorts.map((sort) => (
-                <option key={sort} value={sort}>
-                  {c.sortLabels[sort]}
-                </option>
-              ))}
-            </select>
+              options={catalogSorts.map((sort) => ({
+                value: sort,
+                label: c.sortLabels[sort],
+              }))}
+              onChange={(value) => {
+                setCatalogSort(value as CatalogSort);
+                const next = new URLSearchParams(searchParams);
+                next.set("page", "1");
+                setSearchParams(next);
+              }}
+            />
           </label>
           <button
             className="ghost-button"
@@ -783,6 +816,28 @@ export function CatalogPage() {
             </div>,
           ])}
         />
+        <PaginationStrip
+          meta={productsQuery.data?.meta}
+          page={page}
+          pageSize={pageSize}
+          pageSizeOptions={PAGE_SIZE_OPTIONS}
+          label={c.paginationLabel}
+          pageSizeLabel={c.rowsPerPage}
+          previous={c.previous}
+          next={c.next}
+          pageOf={c.pageOf}
+          onPageChange={(nextPage) => {
+            const next = new URLSearchParams(searchParams);
+            next.set("page", String(nextPage));
+            setSearchParams(next);
+          }}
+          onPageSizeChange={(nextPageSize) => {
+            const next = new URLSearchParams(searchParams);
+            next.set("limit", String(nextPageSize));
+            next.set("page", "1");
+            setSearchParams(next);
+          }}
+        />
       </Panel>
       <Panel
         title={editingProduct ? c.editProduct(editingProduct.name) : c.createProduct}
@@ -839,17 +894,24 @@ export function CatalogPage() {
           </label>
           <label htmlFor="product-category">
             {c.category}
-            <select
-              id="product-category"
-              {...productForm.register("categoryId")}
-            >
-              <option value="">{c.selectCategory}</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
+            <Controller
+              control={productForm.control}
+              name="categoryId"
+              render={({ field }) => (
+                <SelectMenu
+                  id="product-category"
+                  value={field.value ?? ""}
+                  options={[
+                    { value: "", label: c.selectCategory },
+                    ...categories.map((category) => ({
+                      value: category.id,
+                      label: category.name,
+                    })),
+                  ]}
+                  onChange={field.onChange}
+                />
+              )}
+            />
             {productForm.formState.errors.categoryId && (
               <span className="field-error">
                 {readFormError(productForm.formState.errors.categoryId.message, language)}
@@ -1033,17 +1095,24 @@ export function CatalogPage() {
           >
             <label htmlFor="variant-productId">
               {c.product}
-              <select
-                id="variant-productId"
-                {...variantForm.register("productId")}
-              >
-                  <option value="">{c.selectProduct}</option>
-                {products.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {product.name}
-                  </option>
-                ))}
-              </select>
+              <Controller
+                control={variantForm.control}
+                name="productId"
+                render={({ field }) => (
+                  <SelectMenu
+                    id="variant-productId"
+                    value={field.value ?? ""}
+                    options={[
+                      { value: "", label: c.selectProduct },
+                      ...products.map((product) => ({
+                        value: product.id,
+                        label: product.name,
+                      })),
+                    ]}
+                    onChange={field.onChange}
+                  />
+                )}
+              />
               {variantForm.formState.errors.productId && (
                 <span className="field-error">
                   {readFormError(variantForm.formState.errors.productId.message, language)}
@@ -1560,14 +1629,24 @@ function ImageAttachForm({
     >
       <label htmlFor="image-productId">
         {c.imageTarget}
-        <select id="image-productId" {...form.register("productId")}>
-          <option value="">{c.imageTarget}</option>
-          {products.map((product) => (
-            <option key={product.id} value={product.id}>
-              {product.name}
-            </option>
-          ))}
-        </select>
+        <Controller
+          control={form.control}
+          name="productId"
+          render={({ field }) => (
+            <SelectMenu
+              id="image-productId"
+              value={field.value ?? ""}
+              options={[
+                { value: "", label: c.imageTarget },
+                ...products.map((product) => ({
+                  value: product.id,
+                  label: product.name,
+                })),
+              ]}
+              onChange={field.onChange}
+            />
+          )}
+        />
         {form.formState.errors.productId && (
           <span className="field-error">
             {readFormError(form.formState.errors.productId.message, language)}

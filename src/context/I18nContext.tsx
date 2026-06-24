@@ -14,6 +14,7 @@ const storageKey = "j-commerce-admin-language";
 const translations = {
   en: {
     language: { label: "Language", english: "English", indonesian: "Indonesian" },
+    theme: { label: "Theme", light: "Light", dark: "Dark" },
     app: { loading: "Loading admin surface..." },
     common: {
       loadingLiveData: "Loading live data...",
@@ -121,6 +122,7 @@ const translations = {
   },
   id: {
     language: { label: "Bahasa", english: "English", indonesian: "Indonesia" },
+    theme: { label: "Tema", light: "Terang", dark: "Gelap" },
     app: { loading: "Memuat admin..." },
     common: {
       loadingLiveData: "Memuat data live...",

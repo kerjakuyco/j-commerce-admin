@@ -13,6 +13,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { LanguageToggle } from "./LanguageToggle";
+import { ThemeToggle } from "./ThemeToggle";
 import { API_BASE_URL, request } from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
@@ -55,7 +56,7 @@ export function Shell() {
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-sigil">J</div>
-          <div>
+          <div className="brand-copy">
             <strong>j-commerce</strong>
             <span>{t.shell.adminConsole}</span>
           </div>
@@ -79,6 +80,9 @@ export function Shell() {
             );
           })}
         </nav>
+        <div className="sidebar-controls">
+          <ThemeToggle />
+        </div>
         <div className="operator-card">
           <span className="eyebrow">{t.shell.operator}</span>
           <strong>{session?.user.name}</strong>

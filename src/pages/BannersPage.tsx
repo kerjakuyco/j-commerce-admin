@@ -1,16 +1,16 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ImageOff, Megaphone, Pencil, Power, Trash2 } from "lucide-react";
+import { ImageOff, Megaphone, Pencil, Power, Search, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
-import { Badge } from "../components/Badge";
 import { ErrorState } from "../components/ErrorState";
 import { ImageUploadButton } from "../components/ImageUploadButton";
 import { LoadingState } from "../components/LoadingState";
 import { NumberInput } from "../components/NumberInput";
 import { Panel } from "../components/Panel";
+import { SelectMenu } from "../components/SelectMenu";
 import { useToken } from "../context/AuthContext";
 import { useI18n, type Language } from "../context/I18nContext";
 import { request } from "../lib/api";
@@ -54,6 +54,14 @@ type BannerCopy = {
   listTitle: string;
   listEyebrow: string;
   empty: string;
+  noMatches: string;
+  filtersLabel: string;
+  searchLabel: string;
+  searchPlaceholder: string;
+  bannersCount: (count: number) => string;
+  status: string;
+  allStatuses: string;
+  reset: string;
   imageUnavailable: string;
   active: string;
   inactive: string;
@@ -89,6 +97,14 @@ const copy: Record<Language, BannerCopy> = {
     listTitle: "Home banners",
     listEyebrow: "visual merchandising",
     empty: "No banners yet. Publish one to fill the home carousel.",
+    noMatches: "No banners match these filters.",
+    filtersLabel: "Banner filters",
+    searchLabel: "Search banners",
+    searchPlaceholder: "Search title or link",
+    bannersCount: (count) => `${count} ${count === 1 ? "banner" : "banners"}`,
+    status: "Status",
+    allStatuses: "All statuses",
+    reset: "Reset",
     imageUnavailable: "Image unavailable",
     active: "Active",
     inactive: "Inactive",
@@ -122,6 +138,14 @@ const copy: Record<Language, BannerCopy> = {
     listTitle: "Home Banner",
     listEyebrow: "visual merchandising",
     empty: "Belum ada banner. Publish satu banner untuk mengisi carousel home.",
+    noMatches: "Tidak ada banner yang cocok dengan filter ini.",
+    filtersLabel: "Filter banner",
+    searchLabel: "Cari banner",
+    searchPlaceholder: "Cari judul atau link",
+    bannersCount: (count) => `${count} banner`,
+    status: "Status",
+    allStatuses: "Semua status",
+    reset: "Reset",
     imageUnavailable: "Gambar tidak tersedia",
     active: "Active",
     inactive: "Inactive",
@@ -155,6 +179,8 @@ export function BannersPage() {
   const c = copy[language];
   const queryClient = useQueryClient();
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"" | "active" | "inactive">("");
   const bannersQuery = useQuery({
     queryKey: ["banners"],
     queryFn: ({ signal }) =>
@@ -230,6 +256,15 @@ export function BannersPage() {
     return <ErrorState message={readError(bannersQuery.error, language)} />;
 
   const banners = bannersQuery.data ?? [];
+  const normalizedSearch = search.trim().toLowerCase();
+  const filteredBanners = banners.filter((banner) => {
+    const matchesSearch = normalizedSearch
+      ? `${banner.title} ${banner.link ?? ""}`.toLowerCase().includes(normalizedSearch)
+      : true;
+    const matchesStatus =
+      !statusFilter || (statusFilter === "active" ? banner.isActive : !banner.isActive);
+    return matchesSearch && matchesStatus;
+  });
   const savingBanner = createBanner.isPending || updateBanner.isPending;
 
   const startEditingBanner = (banner: Banner) => {
@@ -246,19 +281,66 @@ export function BannersPage() {
   };
 
   return (
-    <div className="split-layout">
+    <div className="split-layout banners-layout">
       <Panel
         title={c.listTitle}
         eyebrow={c.listEyebrow}
+        headerMeta={c.bannersCount(filteredBanners.length)}
         className="banner-list-panel"
       >
+        <div className="list-filter-bar banner-filter-bar" aria-label={c.filtersLabel}>
+          <label htmlFor="banner-search">
+            {c.searchLabel}
+            <span className="filter-input-with-icon">
+              <Search size={16} aria-hidden="true" />
+              <input
+                id="banner-search"
+                name="search"
+                type="search"
+                autoComplete="off"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={c.searchPlaceholder}
+              />
+            </span>
+          </label>
+          <label htmlFor="banner-status-filter">
+            {c.status}
+            <SelectMenu
+              id="banner-status-filter"
+              value={statusFilter}
+              options={[
+                { value: "", label: c.allStatuses },
+                { value: "active", label: c.active },
+                { value: "inactive", label: c.inactive },
+              ]}
+              onChange={(value) =>
+                setStatusFilter(value as "" | "active" | "inactive")
+              }
+            />
+          </label>
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={() => {
+              setSearch("");
+              setStatusFilter("");
+            }}
+          >
+            {c.reset}
+          </button>
+        </div>
         <div className="banner-wall">
           {banners.length === 0 ? (
             <div className="empty-inline">
               {c.empty}
             </div>
+          ) : filteredBanners.length === 0 ? (
+            <div className="empty-inline">
+              {c.noMatches}
+            </div>
           ) : (
-            banners.map((banner) => {
+            filteredBanners.map((banner) => {
               const imageUrl = isAssetUrl(banner.image)
                 ? normalizeAssetUrl(banner.image)
                 : null;
@@ -288,15 +370,17 @@ export function BannersPage() {
                   <div className="banner-card-body">
                     <div className="banner-card-heading">
                       <strong title={banner.title}>{banner.title}</strong>
-                      <Badge tone={banner.isActive ? "good" : "neutral"}>
-                        {banner.isActive ? c.active : c.inactive}
-                      </Badge>
                     </div>
                     <div className="banner-meta">
+                      <span
+                        className={`badge ${banner.isActive ? "badge-good" : "badge-danger"}`}
+                      >
+                        {banner.isActive ? c.active : c.inactive}
+                      </span>
+                      <span>{c.order} {banner.sortOrder}</span>
                       <span title={banner.link ?? undefined}>
                         {banner.link || c.noLink}
                       </span>
-                      <span>{c.order} {banner.sortOrder}</span>
                     </div>
                   </div>
                   <div className="banner-actions">

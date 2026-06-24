@@ -6,6 +6,7 @@ import {
   AreaChart,
   Bar,
   BarChart,
+  Cell,
   CartesianGrid,
   ResponsiveContainer,
   Tooltip,
@@ -27,14 +28,16 @@ import type {
   TopProduct,
 } from "../types";
 
-const chartBlue = "oklch(54.6% 0.215 262)";
-const chartGreen = "oklch(62% 0.17 148)";
-const chartGrid = "oklch(64% 0.025 250 / 0.18)";
-const chartMuted = "oklch(50% 0.03 255)";
-const tooltipStyle = {
-  background: "oklch(99.7% 0.002 260)",
-  border: "1px solid oklch(90% 0.014 250)",
-  borderRadius: 14,
+const chartBlue = "var(--primary)";
+const chart = {
+  grid: "var(--line)",
+  muted: "var(--muted)",
+  tooltip: {
+    background: "var(--surface)",
+    border: "1px solid var(--line)",
+    borderRadius: 14,
+    color: "var(--ink)",
+  },
 };
 const dashboardPeriods = ["7d", "30d", "90d", "1y"] as const;
 type DashboardPeriod = (typeof dashboardPeriods)[number];
@@ -91,6 +94,7 @@ export function DashboardPage() {
   const breakdown = statusQuery.data ?? [];
   const alerts = alertsQuery.data ?? [];
   const alertLabels = t.dashboard.alertLabels as Record<string, string>;
+  const statusLabels = t.dashboard.statusLabels as Record<string, string>;
 
   return (
     <div className="dashboard-grid">
@@ -99,48 +103,22 @@ export function DashboardPage() {
         eyebrow={t.dashboard.today}
         className="hero-panel"
       >
-        <p>{t.dashboard.summary}</p>
-        <ul className="operation-strip" aria-label={t.dashboard.operations}>
-          <li>{t.dashboard.operationOrders}</li>
-          <li>{t.dashboard.operationCatalog}</li>
-          <li>{t.dashboard.operationPromos}</li>
-          <li>{t.dashboard.operationAssets}</li>
-        </ul>
-      </Panel>
-      <Panel
-        title={t.dashboard.operationsAlerts}
-        eyebrow={t.dashboard.needsAttention}
-        className="dashboard-alerts-panel"
-      >
-        {alertsQuery.error ? (
-          <p className="field-error">
-            {t.dashboard.alertsUnavailable}: {readError(alertsQuery.error, language)}
-          </p>
-        ) : alertsQuery.isLoading ? (
-          <p className="panel-empty-state">{t.dashboard.loadingAlerts}</p>
-        ) : alerts.length === 0 ? (
-          <p className="panel-empty-state">{t.dashboard.noAlerts}</p>
-        ) : (
-          <div className="dashboard-alert-list">
-            {alerts.map((alert) => (
-              <Link
-                key={alert.id}
-                to={alert.href}
-                className="dashboard-alert-link"
-              >
-                <span>
-                  <strong>{alertLabels[alert.id] ?? alert.label}</strong>
-                  <small>
-                    {alert.count === 0
-                      ? t.dashboard.alertClear
-                      : t.dashboard.alertOpenRelated}
-                  </small>
-                </span>
-                <Badge tone={alert.tone}>{number(alert.count, language)}</Badge>
-              </Link>
+        <div className="snapshot-content">
+          <p>{t.dashboard.summary}</p>
+          <ul className="operation-strip" aria-label={t.dashboard.operations}>
+            {[
+              t.dashboard.operationOrders,
+              t.dashboard.operationCatalog,
+              t.dashboard.operationPromos,
+              t.dashboard.operationAssets,
+            ].map((label, index) => (
+              <li key={label}>
+                <span>{String(index + 1).padStart(2, "0")}</span>
+                <strong>{label}</strong>
+              </li>
             ))}
-          </div>
-        )}
+          </ul>
+        </div>
       </Panel>
       {stats ? (
         <div className="stat-grid">
@@ -176,6 +154,41 @@ export function DashboardPage() {
         </p>
       ) : null}
       <Panel
+        title={t.dashboard.operationsAlerts}
+        eyebrow={t.dashboard.needsAttention}
+        className="dashboard-alerts-panel"
+      >
+        {alertsQuery.error ? (
+          <p className="field-error">
+            {t.dashboard.alertsUnavailable}: {readError(alertsQuery.error, language)}
+          </p>
+        ) : alertsQuery.isLoading ? (
+          <p className="panel-empty-state">{t.dashboard.loadingAlerts}</p>
+        ) : alerts.length === 0 ? (
+          <p className="panel-empty-state">{t.dashboard.noAlerts}</p>
+        ) : (
+          <div className="dashboard-alert-list">
+            {alerts.map((alert) => (
+              <Link
+                key={alert.id}
+                to={alert.href}
+                className="dashboard-alert-link"
+              >
+                <span>
+                  <strong>{alertLabels[alert.id] ?? alert.label}</strong>
+                  <small>
+                    {alert.count === 0
+                      ? t.dashboard.alertClear
+                      : t.dashboard.alertOpenRelated}
+                  </small>
+                </span>
+                <Badge tone={alert.tone}>{number(alert.count, language)}</Badge>
+              </Link>
+            ))}
+          </div>
+        )}
+      </Panel>
+      <Panel
         title={t.dashboard.orderStatus}
         eyebrow={t.dashboard.orderStatusEyebrow}
         className="dashboard-status-panel chart-panel"
@@ -194,27 +207,37 @@ export function DashboardPage() {
                   margin={{ top: 8, right: 18, left: 0, bottom: 4 }}
                   barCategoryGap={12}
                 >
-                  <CartesianGrid stroke={chartGrid} horizontal={false} />
+                  <CartesianGrid stroke={chart.grid} horizontal={false} />
                   <XAxis
                     type="number"
-                    stroke={chartMuted}
+                    stroke={chart.muted}
                     tickLine={false}
                     axisLine={false}
                   />
                   <YAxis
                     dataKey="status"
                     type="category"
-                    stroke={chartMuted}
+                    stroke={chart.muted}
+                    tickFormatter={(status) => statusLabels[status] ?? status}
                     tickLine={false}
                     axisLine={false}
                     width={110}
                   />
-                  <Tooltip contentStyle={tooltipStyle} />
+                  <Tooltip
+                    contentStyle={chart.tooltip}
+                    cursor={{ fill: "var(--surface-3)" }}
+                  />
                   <Bar
                     dataKey="count"
-                    fill={chartGreen}
                     radius={[0, 8, 8, 0]}
-                  />
+                  >
+                    {breakdown.map((item) => (
+                      <Cell
+                        key={item.status}
+                        fill={statusBarFill(item.status)}
+                      />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -225,7 +248,7 @@ export function DashboardPage() {
               {breakdown.map((item) => (
                 <Link key={item.status} to={`/orders?status=${item.status}`}>
                   <Badge tone={orderTone(item.status)}>
-                    {t.dashboard.statusLabels[item.status]}
+                    {statusLabels[item.status]}
                   </Badge>
                   <span>{t.dashboard.orderCount(number(item.count, language))}</span>
                 </Link>
@@ -252,7 +275,7 @@ export function DashboardPage() {
                   </small>
                 </span>
                 <Badge tone={orderTone(order.status)}>
-                  {t.dashboard.statusLabels[order.status]}
+                  {statusLabels[order.status]}
                 </Badge>
               </Link>
             ))}
@@ -271,26 +294,34 @@ export function DashboardPage() {
             {t.dashboard.topUnavailable}: {readError(topQuery.error, language)}
           </p>
         ) : (
-          <div className="stack-list">
+          <div className="top-product-list">
             {topQuery.isLoading ? (
               <p className="panel-empty-state">{t.dashboard.loadingTop}</p>
             ) : topProducts.length === 0 ? (
               <p className="panel-empty-state">{t.dashboard.noSold}</p>
             ) : (
-              topProducts.map((item, index) => (
-                <Link
-                  key={item.product?.id ?? `top-${index}`}
-                  to={`/catalog?search=${encodeURIComponent(item.product?.name ?? "")}`}
-                >
-                  <strong>
-                    {item.product?.name ?? t.dashboard.unknownProduct}
-                  </strong>
-                  <span>
-                    {number(item.totalSold, language)} {t.dashboard.sold} ·{" "}
-                    {money(item.revenue)}
-                  </span>
-                </Link>
-              ))
+              topProducts.map((item, index) => {
+                const productName = item.product?.name ?? t.dashboard.unknownProduct;
+
+                return (
+                  <Link
+                    key={item.product?.id ?? `top-${index}`}
+                    to={`/catalog?search=${encodeURIComponent(item.product?.name ?? "")}`}
+                    className="top-product-item"
+                  >
+                    <span className="top-product-rank">
+                      {String(index + 1).padStart(2, "0")}
+                    </span>
+                    <span className="top-product-copy">
+                      <strong title={productName}>{productName}</strong>
+                      <small>
+                        {number(item.totalSold, language)} {t.dashboard.sold}
+                      </small>
+                    </span>
+                    <span className="top-product-revenue">{money(item.revenue)}</span>
+                  </Link>
+                );
+              })
             )}
           </div>
         )}
@@ -337,10 +368,10 @@ export function DashboardPage() {
                     />
                   </linearGradient>
                 </defs>
-                <CartesianGrid stroke={chartGrid} vertical={false} />
+                <CartesianGrid stroke={chart.grid} vertical={false} />
                 <XAxis
                   dataKey="date"
-                  stroke={chartMuted}
+                  stroke={chart.muted}
                   tickFormatter={(value) =>
                     formatRevenueDate(
                       value,
@@ -352,14 +383,14 @@ export function DashboardPage() {
                   axisLine={false}
                 />
                 <YAxis
-                  stroke={chartMuted}
+                  stroke={chart.muted}
                   tickLine={false}
                   axisLine={false}
                   width={86}
                   tickCount={5}
                 />
                 <Tooltip
-                  contentStyle={tooltipStyle}
+                  contentStyle={chart.tooltip}
                   labelFormatter={(value) =>
                     formatRevenueDate(value, "full", language)
                   }
@@ -378,6 +409,15 @@ export function DashboardPage() {
       </Panel>
     </div>
   );
+}
+
+function statusBarFill(status: OrderStatusBreakdown["status"]) {
+  const tone = orderTone(status);
+  if (tone === "good") return "var(--green)";
+  if (tone === "warn") return "var(--yellow)";
+  if (tone === "danger") return "var(--red)";
+  if (tone === "hot") return "var(--primary)";
+  return "var(--line-strong)";
 }
 
 function growthLabel(value: number | undefined, suffix: string, language: "en" | "id") {

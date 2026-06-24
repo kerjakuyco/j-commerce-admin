@@ -7,6 +7,7 @@ import './index.css'
 import App from './App.tsx'
 import { AuthProvider } from './context/AuthContext.tsx'
 import { I18nProvider } from './context/I18nContext.tsx'
+import { ThemeProvider, useTheme } from './context/ThemeContext.tsx'
 import { ApiError } from './lib/api'
 
 const queryClient = new QueryClient({
@@ -25,13 +26,20 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <I18nProvider>
-        <AuthProvider>
-          <BrowserRouter>
-            <App />
-            <Toaster richColors position="top-right" />
-          </BrowserRouter>
-        </AuthProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <BrowserRouter>
+              <App />
+              <ThemedToaster />
+            </BrowserRouter>
+          </AuthProvider>
+        </ThemeProvider>
       </I18nProvider>
     </QueryClientProvider>
   </StrictMode>,
 )
+
+function ThemedToaster() {
+  const { theme } = useTheme()
+  return <Toaster richColors position="top-right" theme={theme} />
+}

@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Power, PowerOff, TicketPlus } from "lucide-react";
+import { Pencil, Power, PowerOff, Search, TicketPlus } from "lucide-react";
 import { useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
@@ -9,7 +9,9 @@ import { DataTable } from "../components/DataTable";
 import { ErrorState } from "../components/ErrorState";
 import { LoadingState } from "../components/LoadingState";
 import { NumberInput } from "../components/NumberInput";
+import { PaginationStrip } from "../components/PaginationStrip";
 import { Panel } from "../components/Panel";
+import { SelectMenu } from "../components/SelectMenu";
 import { useToken } from "../context/AuthContext";
 import { useI18n, type Language } from "../context/I18nContext";
 import { ApiError, request } from "../lib/api";
@@ -94,6 +96,8 @@ const emptyVoucherForm: VoucherFormInput = {
   expiresAt: "",
   isActive: true,
 };
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+const DEFAULT_PAGE_SIZE = 25;
 
 type VoucherCopy = {
   created: string;
@@ -103,6 +107,14 @@ type VoucherCopy = {
   listTitle: string;
   listEyebrow: string;
   tableCaption: string;
+  filtersLabel: string;
+  searchLabel: string;
+  searchPlaceholder: string;
+  vouchersCount: (count: number) => string;
+  allTypes: string;
+  allStatuses: string;
+  status: string;
+  reset: string;
   columns: string[];
   voucherLabel: string;
   typeLabels: Record<VoucherType, string>;
@@ -132,7 +144,28 @@ type VoucherCopy = {
   update: string;
   create: string;
   cancel: string;
+  paginationLabel: string;
+  rowsPerPage: string;
+  previous: string;
+  next: string;
+  pageOf: (page: number, totalPages: number) => string;
 };
+
+type VoucherStatusFilter =
+  | ""
+  | "ACTIVE"
+  | "INACTIVE"
+  | "SCHEDULED"
+  | "EXPIRED"
+  | "EXHAUSTED";
+
+const voucherStatusFilters: Exclude<VoucherStatusFilter, "">[] = [
+  "ACTIVE",
+  "INACTIVE",
+  "SCHEDULED",
+  "EXPIRED",
+  "EXHAUSTED",
+];
 
 const copy: Record<Language, VoucherCopy> = {
   en: {
@@ -143,6 +176,14 @@ const copy: Record<Language, VoucherCopy> = {
     listTitle: "Vouchers",
     listEyebrow: "promo rules",
     tableCaption: "Voucher rules table",
+    filtersLabel: "Voucher filters",
+    searchLabel: "Search vouchers",
+    searchPlaceholder: "Search code or description",
+    vouchersCount: (count) => `${count} ${count === 1 ? "voucher" : "vouchers"}`,
+    allTypes: "All types",
+    allStatuses: "All statuses",
+    status: "Status",
+    reset: "Reset",
     columns: ["Code", "Type", "Value", "Quota", "Minimum", "Validity", "Status", "Action"],
     voucherLabel: "voucher",
     typeLabels: { FIXED: "Fixed", PERCENTAGE: "Percentage" },
@@ -172,6 +213,11 @@ const copy: Record<Language, VoucherCopy> = {
     update: "Update voucher",
     create: "Create voucher",
     cancel: "Cancel edit",
+    paginationLabel: "Voucher table pagination",
+    rowsPerPage: "Rows per page",
+    previous: "Previous",
+    next: "Next",
+    pageOf: (page, totalPages) => `Page ${page} of ${totalPages}`,
   },
   id: {
     created: "Voucher dibuat",
@@ -181,6 +227,14 @@ const copy: Record<Language, VoucherCopy> = {
     listTitle: "Voucher",
     listEyebrow: "aturan promo",
     tableCaption: "Tabel aturan voucher",
+    filtersLabel: "Filter voucher",
+    searchLabel: "Cari voucher",
+    searchPlaceholder: "Cari kode atau deskripsi",
+    vouchersCount: (count) => `${count} voucher`,
+    allTypes: "Semua tipe",
+    allStatuses: "Semua status",
+    status: "Status",
+    reset: "Reset",
     columns: ["Kode", "Tipe", "Nilai", "Kuota", "Minimum", "Periode", "Status", "Aksi"],
     voucherLabel: "voucher",
     typeLabels: { FIXED: "Fixed", PERCENTAGE: "Percentage" },
@@ -210,6 +264,11 @@ const copy: Record<Language, VoucherCopy> = {
     update: "Perbarui voucher",
     create: "Buat voucher",
     cancel: "Batal edit",
+    paginationLabel: "Pagination tabel voucher",
+    rowsPerPage: "Baris per halaman",
+    previous: "Sebelumnya",
+    next: "Berikutnya",
+    pageOf: (page, totalPages) => `Halaman ${page} dari ${totalPages}`,
   },
 };
 
@@ -219,16 +278,26 @@ export function VouchersPage() {
   const c = copy[language];
   const queryClient = useQueryClient();
   const [editingVoucher, setEditingVoucher] = useState<Voucher | null>(null);
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState<"" | VoucherType>("");
+  const [statusFilter, setStatusFilter] = useState<VoucherStatusFilter>("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const vouchersQuery = useQuery({
-    queryKey: ["vouchers", "admin"],
+    queryKey: ["vouchers", "admin", page, pageSize, search, typeFilter, statusFilter],
     queryFn: ({ signal }) => {
       // Prefer the admin endpoint (includes expired/inactive/exhausted rows).
       // Fall back to the public active list if the API has not shipped it yet.
       const run = (path: string) =>
         request<Paginated<Voucher>>(path, { token, signal });
-      return run("/vouchers/admin/all?limit=80").catch((error: unknown) => {
+      const params = new URLSearchParams({ limit: String(pageSize), page: String(page) });
+      if (search.trim()) params.set("search", search.trim());
+      if (typeFilter) params.set("type", typeFilter);
+      if (statusFilter) params.set("status", statusFilter);
+      const query = params.toString();
+      return run(`/vouchers/admin/all?${query}`).catch((error: unknown) => {
         if (error instanceof ApiError && error.status === 404) {
-          return run("/vouchers?limit=80");
+          return run(`/vouchers?${query}`);
         }
         throw error;
       });
@@ -318,8 +387,81 @@ export function VouchersPage() {
   };
 
   return (
-    <div className="split-layout">
-      <Panel title={c.listTitle} eyebrow={c.listEyebrow}>
+    <div className="split-layout vouchers-layout">
+      <Panel
+        title={c.listTitle}
+        eyebrow={c.listEyebrow}
+        headerMeta={c.vouchersCount(vouchersQuery.data?.meta.total ?? vouchers.length)}
+        className="voucher-list-panel"
+      >
+        <div className="list-filter-bar" aria-label={c.filtersLabel}>
+          <label htmlFor="voucher-search">
+            {c.searchLabel}
+            <span className="filter-input-with-icon">
+              <Search size={16} aria-hidden="true" />
+              <input
+                id="voucher-search"
+                name="search"
+                type="search"
+                autoComplete="off"
+                value={search}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  setPage(1);
+                }}
+                placeholder={c.searchPlaceholder}
+              />
+            </span>
+          </label>
+          <label htmlFor="voucher-type-filter">
+            {c.type}
+            <SelectMenu
+              id="voucher-type-filter"
+              value={typeFilter}
+              options={[
+                { value: "", label: c.allTypes },
+                ...voucherTypes.map((type: VoucherType) => ({
+                  value: type,
+                  label: c.typeLabels[type],
+                })),
+              ]}
+              onChange={(value) => {
+                setTypeFilter(value as "" | VoucherType);
+                setPage(1);
+              }}
+            />
+          </label>
+          <label htmlFor="voucher-status-filter">
+            {c.status}
+            <SelectMenu
+              id="voucher-status-filter"
+              value={statusFilter}
+              options={[
+                { value: "", label: c.allStatuses },
+                ...voucherStatusFilters.map((status) => ({
+                  value: status,
+                  label: voucherStatusLabel(status, c),
+                })),
+              ]}
+              onChange={(value) => {
+                setStatusFilter(value as VoucherStatusFilter);
+                setPage(1);
+              }}
+            />
+          </label>
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={() => {
+              setSearch("");
+              setTypeFilter("");
+              setStatusFilter("");
+              setPage(1);
+            }}
+          >
+            {c.reset}
+          </button>
+        </div>
         <DataTable
           caption={c.tableCaption}
           columns={c.columns}
@@ -368,6 +510,22 @@ export function VouchersPage() {
             </div>,
           ])}
         />
+        <PaginationStrip
+          meta={vouchersQuery.data?.meta}
+          page={page}
+          pageSize={pageSize}
+          pageSizeOptions={PAGE_SIZE_OPTIONS}
+          label={c.paginationLabel}
+          pageSizeLabel={c.rowsPerPage}
+          previous={c.previous}
+          next={c.next}
+          pageOf={c.pageOf}
+          onPageChange={setPage}
+          onPageSizeChange={(nextPageSize) => {
+            setPageSize(nextPageSize);
+            setPage(1);
+          }}
+        />
       </Panel>
       <Panel
         title={editingVoucher ? c.formEdit : c.formCreate}
@@ -397,11 +555,21 @@ export function VouchersPage() {
           </label>
           <label htmlFor="voucher-type">
             {c.type}
-            <select id="voucher-type" {...form.register("type")}>
-              {voucherTypes.map((type: VoucherType) => (
-                <option key={type} value={type}>{c.typeLabels[type]}</option>
-              ))}
-            </select>
+            <Controller
+              control={form.control}
+              name="type"
+              render={({ field }) => (
+                <SelectMenu
+                  id="voucher-type"
+                  value={field.value}
+                  options={voucherTypes.map((type: VoucherType) => ({
+                    value: type,
+                    label: c.typeLabels[type],
+                  }))}
+                  onChange={(value) => field.onChange(value as VoucherType)}
+                />
+              )}
+            />
             {form.formState.errors.type && (
               <span className="field-error">
                 {readFormError(form.formState.errors.type.message, language)}
@@ -631,4 +799,15 @@ function VoucherStatusBadge({
   }
 
   return <span className="badge badge-good">{copy.active}</span>;
+}
+
+function voucherStatusLabel(
+  status: Exclude<VoucherStatusFilter, "">,
+  copy: VoucherCopy,
+) {
+  if (status === "ACTIVE") return copy.active;
+  if (status === "INACTIVE") return copy.inactive;
+  if (status === "SCHEDULED") return copy.scheduled;
+  if (status === "EXPIRED") return copy.expired;
+  return copy.exhausted;
 }

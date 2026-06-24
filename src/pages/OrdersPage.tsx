@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, Eye, X, XCircle } from "lucide-react";
+import { Copy, Eye, Search, X, XCircle } from "lucide-react";
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -7,14 +7,20 @@ import { Badge, orderTone, paymentTone } from "../components/Badge";
 import { DataTable } from "../components/DataTable";
 import { ErrorState } from "../components/ErrorState";
 import { LoadingState } from "../components/LoadingState";
+import { PaginationStrip } from "../components/PaginationStrip";
 import { Panel } from "../components/Panel";
+import { SelectMenu } from "../components/SelectMenu";
 import { useToken } from "../context/AuthContext";
 import { useI18n, type Language } from "../context/I18nContext";
 import { normalizeAssetUrl } from "../lib/asset-url";
 import {
   allowedStatusTransitions,
+  isPaymentStatus,
   isOrderStatus,
+  isShippingMethod,
   orderStatuses,
+  paymentStatuses,
+  shippingMethods,
 } from "../lib/constants";
 import { request } from "../lib/api";
 import { money, readError, shortDate } from "../lib/format";
@@ -27,6 +33,8 @@ import type {
 } from "../types";
 
 const CANCELLABLE_STATUSES: OrderStatus[] = ["PENDING", "PAID"];
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+const DEFAULT_PAGE_SIZE = 25;
 
 type OrdersCopy = {
   updated: string;
@@ -34,8 +42,14 @@ type OrdersCopy = {
   title: string;
   eyebrow: string;
   filtersLabel: string;
+  searchLabel: string;
+  searchPlaceholder: string;
   status: string;
   allStatuses: string;
+  paymentStatus: string;
+  allPaymentStatuses: string;
+  shippingMethod: string;
+  allShippingMethods: string;
   reset: string;
   ordersCount: (count: number) => string;
   tableCaption: string;
@@ -51,6 +65,7 @@ type OrdersCopy = {
   cancelReasonPrompt: (orderNumber: string) => string;
   cancelConfirm: (orderNumber: string) => string;
   paginationLabel: string;
+  rowsPerPage: string;
   previous: string;
   next: string;
   pageOf: (page: number, totalPages: number) => string;
@@ -65,6 +80,7 @@ type OrdersCopy = {
   noEmail: string;
   noPhone: string;
   delivery: string;
+  address: string;
   noTracking: string;
   noAddress: string;
   payment: string;
@@ -81,7 +97,9 @@ type OrdersCopy = {
   subtotalShipping: (subtotal: string, shipping: string) => string;
   voucher: (code: string) => string;
   discount: (value: string) => string;
+  items: string;
   itemsUnavailable: string;
+  timelineTitle: string;
   timeline: Record<"created" | "paid" | "shipped" | "delivered" | "cancelled", string>;
   statusLabels: Record<OrderStatus, string>;
   paymentLabels: Record<PaymentStatus, string>;
@@ -95,8 +113,14 @@ const copy: Record<Language, OrdersCopy> = {
     title: "Order management",
     eyebrow: "fulfillment",
     filtersLabel: "Order filters",
+    searchLabel: "Search orders",
+    searchPlaceholder: "Invoice, customer, product, voucher",
     status: "Status",
     allStatuses: "All statuses",
+    paymentStatus: "Payment",
+    allPaymentStatuses: "All payments",
+    shippingMethod: "Shipping",
+    allShippingMethods: "All shipping",
     reset: "Reset",
     ordersCount: (count) => `${count} ${count === 1 ? "order" : "orders"}`,
     tableCaption: "Order management table",
@@ -121,6 +145,7 @@ const copy: Record<Language, OrdersCopy> = {
     cancelReasonPrompt: (orderNumber) => `Cancellation reason for ${orderNumber}`,
     cancelConfirm: (orderNumber) => `Cancel order ${orderNumber}?`,
     paginationLabel: "Orders pagination",
+    rowsPerPage: "Rows per page",
     previous: "Previous",
     next: "Next",
     pageOf: (page, totalPages) => `Page ${page} of ${totalPages}`,
@@ -135,6 +160,7 @@ const copy: Record<Language, OrdersCopy> = {
     noEmail: "No email",
     noPhone: "No phone",
     delivery: "Delivery",
+    address: "Shipping address",
     noTracking: "No tracking number",
     noAddress: "No address",
     payment: "Payment",
@@ -151,7 +177,9 @@ const copy: Record<Language, OrdersCopy> = {
     subtotalShipping: (subtotal, shipping) => `Subtotal ${subtotal} · Shipping ${shipping}`,
     voucher: (code) => `Voucher ${code}`,
     discount: (value) => `Discount ${value}`,
+    items: "Items",
     itemsUnavailable: "Items unavailable for this order.",
+    timelineTitle: "Timeline",
     timeline: {
       created: "Created",
       paid: "Paid",
@@ -186,8 +214,14 @@ const copy: Record<Language, OrdersCopy> = {
     title: "Manajemen pesanan",
     eyebrow: "fulfillment",
     filtersLabel: "Filter pesanan",
+    searchLabel: "Cari pesanan",
+    searchPlaceholder: "Invoice, pelanggan, produk, voucher",
     status: "Status",
     allStatuses: "Semua status",
+    paymentStatus: "Pembayaran",
+    allPaymentStatuses: "Semua pembayaran",
+    shippingMethod: "Pengiriman",
+    allShippingMethods: "Semua pengiriman",
     reset: "Reset",
     ordersCount: (count) => `${count} pesanan`,
     tableCaption: "Tabel manajemen pesanan",
@@ -212,6 +246,7 @@ const copy: Record<Language, OrdersCopy> = {
     cancelReasonPrompt: (orderNumber) => `Alasan pembatalan untuk ${orderNumber}`,
     cancelConfirm: (orderNumber) => `Batalkan pesanan ${orderNumber}?`,
     paginationLabel: "Paginasi pesanan",
+    rowsPerPage: "Baris per halaman",
     previous: "Sebelumnya",
     next: "Berikutnya",
     pageOf: (page, totalPages) => `Halaman ${page} dari ${totalPages}`,
@@ -225,13 +260,14 @@ const copy: Record<Language, OrdersCopy> = {
     customer: "Pelanggan",
     noEmail: "Tidak ada email",
     noPhone: "Tidak ada nomor telepon",
-    delivery: "Delivery",
+    delivery: "Pengiriman",
+    address: "Alamat pengiriman",
     noTracking: "Belum ada nomor resi",
     noAddress: "Tidak ada alamat",
     payment: "Pembayaran",
-    methodUnavailable: "Method unavailable",
-    paidAt: (date) => `Paid ${date}`,
-    notPaidYet: "Not paid yet",
+    methodUnavailable: "Metode tidak tersedia",
+    paidAt: (date) => `Dibayar ${date}`,
+    notPaidYet: "Belum dibayar",
     cancellation: "Pembatalan",
     cancelledLabel: "Dibatalkan",
     notCancelled: "Tidak dibatalkan",
@@ -242,13 +278,15 @@ const copy: Record<Language, OrdersCopy> = {
     subtotalShipping: (subtotal, shipping) => `Subtotal ${subtotal} · Shipping ${shipping}`,
     voucher: (code) => `Voucher ${code}`,
     discount: (value) => `Diskon ${value}`,
+    items: "Item pesanan",
     itemsUnavailable: "Item tidak tersedia untuk pesanan ini.",
+    timelineTitle: "Timeline",
     timeline: {
-      created: "Created",
-      paid: "Paid",
-      shipped: "Shipped",
-      delivered: "Delivered",
-      cancelled: "Cancelled",
+      created: "Dibuat",
+      paid: "Dibayar",
+      shipped: "Dikirim",
+      delivered: "Selesai",
+      cancelled: "Dibatalkan",
     },
     statusLabels: {
       PENDING: "Pending",
@@ -280,14 +318,38 @@ export function OrdersPage() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const searchFilter = searchParams.get("search") ?? "";
   const statusParam = searchParams.get("status") ?? "";
+  const paymentStatusParam = searchParams.get("paymentStatus") ?? "";
+  const shippingMethodParam = searchParams.get("shippingMethod") ?? "";
   const pageParam = Number(searchParams.get("page") ?? "1");
+  const pageSizeParam = Number(searchParams.get("limit") ?? String(DEFAULT_PAGE_SIZE));
   const statusFilter = isOrderStatus(statusParam) ? statusParam : "";
+  const paymentStatusFilter = isPaymentStatus(paymentStatusParam)
+    ? paymentStatusParam
+    : "";
+  const shippingMethodFilter = isShippingMethod(shippingMethodParam)
+    ? shippingMethodParam
+    : "";
   const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1;
-  const ordersPath = new URLSearchParams({ limit: "25", page: String(page) });
+  const pageSize = PAGE_SIZE_OPTIONS.includes(pageSizeParam)
+    ? pageSizeParam
+    : DEFAULT_PAGE_SIZE;
+  const ordersPath = new URLSearchParams({ limit: String(pageSize), page: String(page) });
+  if (searchFilter.trim()) ordersPath.set("search", searchFilter.trim());
   if (statusFilter) ordersPath.set("status", statusFilter);
+  if (paymentStatusFilter) ordersPath.set("paymentStatus", paymentStatusFilter);
+  if (shippingMethodFilter) ordersPath.set("shippingMethod", shippingMethodFilter);
   const ordersQuery = useQuery({
-    queryKey: ["orders", statusFilter, page],
+    queryKey: [
+      "orders",
+      searchFilter.trim(),
+      statusFilter,
+      paymentStatusFilter,
+      shippingMethodFilter,
+      page,
+      pageSize,
+    ],
     queryFn: ({ signal }) =>
       request<Paginated<Order>>(`/orders?${ordersPath.toString()}`, { token, signal }),
   });
@@ -332,6 +394,14 @@ export function OrdersPage() {
       request<Order>(`/orders/${selectedOrderId}`, { token, signal }),
   });
 
+  const setOrderParam = (key: string, value: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    next.set("page", "1");
+    setSearchParams(next);
+  };
+
   if (ordersQuery.isLoading) return <LoadingState />;
   if (ordersQuery.error)
     return <ErrorState message={readError(ordersQuery.error, language)} />;
@@ -347,29 +417,101 @@ export function OrdersPage() {
       (status) => status !== order.status && canMoveOrder(order, status),
     );
 
+  const moveOrderStatus = (order: Order, value: OrderStatus) => {
+    if (value === order.status) return;
+    if (
+      !window.confirm(
+        c.moveConfirm(
+          order.orderNumber,
+          c.statusLabels[order.status],
+          c.statusLabels[value],
+        ),
+      )
+    ) {
+      return;
+    }
+    const trackingNumber = value === "SHIPPED"
+      ? window.prompt(
+          c.trackingPrompt(order.orderNumber),
+          order.trackingNumber ?? "",
+        )?.trim()
+      : undefined;
+    if (value === "SHIPPED" && trackingNumber === undefined) {
+      return;
+    }
+    statusMutation.mutate({
+      id: order.id,
+      status: value,
+      trackingNumber,
+    });
+  };
+
   return (
-    <Panel title={c.title} eyebrow={c.eyebrow}>
+    <Panel
+      title={c.title}
+      eyebrow={c.eyebrow}
+      headerMeta={c.ordersCount(ordersQuery.data?.meta.total ?? 0)}
+    >
       <div className="orders-toolbar" aria-label={c.filtersLabel}>
+        <label htmlFor="order-search">
+          {c.searchLabel}
+          <span className="filter-input-with-icon">
+            <Search size={16} aria-hidden="true" />
+            <input
+              id="order-search"
+              name="search"
+              type="search"
+              autoComplete="off"
+              value={searchFilter}
+              onChange={(event) => setOrderParam("search", event.target.value)}
+              placeholder={c.searchPlaceholder}
+            />
+          </span>
+        </label>
         <label htmlFor="order-status-filter">
           {c.status}
-          <select
+          <SelectMenu
             id="order-status-filter"
             value={statusFilter}
-            onChange={(event) => {
-              const next = new URLSearchParams(searchParams);
-              if (event.target.value) next.set("status", event.target.value);
-              else next.delete("status");
-              next.set("page", "1");
-              setSearchParams(next);
-            }}
-          >
-            <option value="">{c.allStatuses}</option>
-            {[...orderStatuses, "CANCELLED" as OrderStatus].map((status) => (
-              <option key={status} value={status}>
-                {c.statusLabels[status]}
-              </option>
-            ))}
-          </select>
+            options={[
+              { value: "", label: c.allStatuses },
+              ...[...orderStatuses, "CANCELLED" as OrderStatus].map((status) => ({
+                value: status,
+                label: c.statusLabels[status],
+              })),
+            ]}
+            onChange={(value) => setOrderParam("status", value)}
+          />
+        </label>
+        <label htmlFor="order-payment-filter">
+          {c.paymentStatus}
+          <SelectMenu
+            id="order-payment-filter"
+            value={paymentStatusFilter}
+            options={[
+              { value: "", label: c.allPaymentStatuses },
+              ...paymentStatuses.map((status) => ({
+                value: status,
+                label: c.paymentLabels[status],
+              })),
+            ]}
+            onChange={(value) => setOrderParam("paymentStatus", value)}
+          />
+        </label>
+        <label htmlFor="order-shipping-filter">
+          {c.shippingMethod}
+          <SelectMenu
+            id="order-shipping-filter"
+            value={shippingMethodFilter}
+            options={[
+              { value: "", label: c.allShippingMethods },
+              ...shippingMethods.map((method) => ({
+                value: method,
+                label: c.shippingLabels[method],
+              })),
+            ]}
+            onChange={(value) => setOrderParam("shippingMethod", value)}
+          />
         </label>
         <button
           className="ghost-button"
@@ -378,9 +520,6 @@ export function OrdersPage() {
         >
           {c.reset}
         </button>
-        <span className="orders-toolbar-meta">
-          {c.ordersCount(ordersQuery.data?.meta.total ?? 0)}
-        </span>
       </div>
       <DataTable
         caption={c.tableCaption}
@@ -419,66 +558,30 @@ export function OrdersPage() {
             </Badge>,
             <strong className="order-total-cell">{money(order.total)}</strong>,
             <div key={`${order.id}-actions`} className="order-action-cell">
+              <OrderStatusMenu
+                order={order}
+                statuses={allowedNextStatuses}
+                disabled={
+                  allowedNextStatuses.length === 0 ||
+                  (statusMutation.isPending &&
+                    statusMutation.variables?.id === order.id)
+                }
+                c={c}
+                onMove={(status) => moveOrderStatus(order, status)}
+              />
               <button
-                className="icon-button"
+                className="order-detail-button"
                 type="button"
                 aria-label={c.viewOrder(order.orderNumber)}
                 title={c.viewDetails}
                 onClick={() => setSelectedOrderId(order.id)}
               >
                 <Eye size={16} aria-hidden="true" />
+                <span>{c.viewDetails}</span>
               </button>
-              <select
-                className="order-status-select"
-                aria-label={c.updateStatus(order.orderNumber)}
-                name={`status-${order.id}`}
-                value={order.status}
-                disabled={
-                  allowedNextStatuses.length === 0 ||
-                  (statusMutation.isPending &&
-                    statusMutation.variables?.id === order.id)
-                }
-                onChange={(event) => {
-                  const value = event.target.value;
-                  if (!isOrderStatus(value)) return;
-                  if (value === order.status) return;
-                  if (
-                    !window.confirm(
-                      c.moveConfirm(
-                        order.orderNumber,
-                        c.statusLabels[order.status],
-                        c.statusLabels[value],
-                      ),
-                    )
-                  ) {
-                    return;
-                  }
-                  const trackingNumber = value === "SHIPPED"
-                    ? window.prompt(
-                        c.trackingPrompt(order.orderNumber),
-                        order.trackingNumber ?? "",
-                      )?.trim()
-                    : undefined;
-                  if (value === "SHIPPED" && trackingNumber === undefined) {
-                    return;
-                  }
-                  statusMutation.mutate({
-                    id: order.id,
-                    status: value,
-                    trackingNumber,
-                  });
-                }}
-              >
-                <option value={order.status}>{c.statusLabels[order.status]}</option>
-                {allowedNextStatuses.map((status) => (
-                  <option key={status} value={status}>
-                    {c.statusLabels[status]}
-                  </option>
-                ))}
-              </select>
               {CANCELLABLE_STATUSES.includes(order.status) && (
                 <button
-                  className="icon-button icon-button-danger"
+                  className="icon-button icon-button-danger order-cancel-button"
                   type="button"
                   aria-label={c.cancelOrder(order.orderNumber)}
                   title={c.cancelOrderTitle}
@@ -507,40 +610,28 @@ export function OrdersPage() {
           ];
         })}
       />
-      {ordersQuery.data?.meta && (
-        <div className="pagination-strip" aria-label={c.paginationLabel}>
-          <button
-            className="ghost-button"
-            type="button"
-            disabled={page <= 1}
-            onClick={() => {
-              const next = new URLSearchParams(searchParams);
-              next.set("page", String(page - 1));
-              setSearchParams(next);
-            }}
-          >
-            {c.previous}
-          </button>
-          <span>
-            {c.pageOf(
-              ordersQuery.data.meta.page,
-              ordersQuery.data.meta.totalPages || 1,
-            )}
-          </span>
-          <button
-            className="ghost-button"
-            type="button"
-            disabled={page >= ordersQuery.data.meta.totalPages}
-            onClick={() => {
-              const next = new URLSearchParams(searchParams);
-              next.set("page", String(page + 1));
-              setSearchParams(next);
-            }}
-          >
-            {c.next}
-          </button>
-        </div>
-      )}
+      <PaginationStrip
+        meta={ordersQuery.data?.meta}
+        page={page}
+        pageSize={pageSize}
+        pageSizeOptions={PAGE_SIZE_OPTIONS}
+        label={c.paginationLabel}
+        pageSizeLabel={c.rowsPerPage}
+        previous={c.previous}
+        next={c.next}
+        pageOf={c.pageOf}
+        onPageChange={(nextPage) => {
+          const next = new URLSearchParams(searchParams);
+          next.set("page", String(nextPage));
+          setSearchParams(next);
+        }}
+        onPageSizeChange={(nextPageSize) => {
+          const next = new URLSearchParams(searchParams);
+          next.set("limit", String(nextPageSize));
+          next.set("page", "1");
+          setSearchParams(next);
+        }}
+      />
       {selectedOrderId && (
         <OrderDetailPanel
           order={orderDetailQuery.data}
@@ -577,29 +668,81 @@ function OrderDetailPanel({
 }) {
   const current = order ?? fallback;
   if (!current) return null;
+  const itemCount = current._count?.items ?? current.items?.length ?? 0;
 
   return (
     <section className="order-detail-panel" aria-label={c.detailLabel}>
       <div className="order-detail-header">
-        <div>
+        <div className="order-detail-title">
           <span className="eyebrow">{c.detailEyebrow}</span>
           <h3>{current.orderNumber}</h3>
+          <div className="order-detail-badges">
+            <Badge tone={orderTone(current.status)}>
+              {c.statusLabels[current.status]}
+            </Badge>
+            <Badge tone={paymentTone(current.paymentStatus)}>
+              {c.paymentLabels[current.paymentStatus]}
+            </Badge>
+          </div>
         </div>
-        <button
-          className="icon-button"
-          type="button"
-          aria-label={c.copyOrderNumber}
-          title={c.copyOrderNumber}
-          onClick={() => copyText(current.orderNumber, c)}
-        >
-          <Copy size={16} aria-hidden="true" />
-        </button>
-        <button className="icon-button" type="button" aria-label={c.closeOrderDetail} onClick={onClose}>
-          <X size={16} aria-hidden="true" />
-        </button>
+        <div className="order-detail-header-actions">
+          <button
+            className="order-detail-copy-button"
+            type="button"
+            aria-label={c.copyOrderNumber}
+            title={c.copyOrderNumber}
+            onClick={() => copyText(current.orderNumber, c)}
+          >
+            <Copy size={15} aria-hidden="true" />
+            <span>{c.copyOrderNumber}</span>
+          </button>
+          <button
+            className="icon-button"
+            type="button"
+            aria-label={c.closeOrderDetail}
+            onClick={onClose}
+          >
+            <X size={16} aria-hidden="true" />
+          </button>
+        </div>
       </div>
       {error ? <p className="field-error">{readError(error, language)}</p> : null}
       {loading ? <p className="copy-block">{c.loadingDetail}</p> : null}
+      <div className="order-detail-summary">
+        <article className="order-summary-card order-summary-card-total">
+          <span>{c.totals}</span>
+          <strong>{money(current.total)}</strong>
+          <small>
+            {c.subtotalShipping(money(current.subtotal), money(current.shippingCost))}
+          </small>
+        </article>
+        <article className="order-summary-card">
+          <span>{c.delivery}</span>
+          <strong>{c.shippingLabels[current.shippingMethod]}</strong>
+          <small>
+            {current.trackingNumber ? (
+              <button
+                className="text-copy-button"
+                type="button"
+                onClick={() => copyText(current.trackingNumber!, c)}
+              >
+                {current.trackingNumber} <Copy size={12} aria-hidden="true" />
+              </button>
+            ) : (
+              c.noTracking
+            )}
+          </small>
+        </article>
+        <article className="order-summary-card">
+          <span>{c.payment}</span>
+          <strong>{current.payment?.method ?? current.payment?.provider ?? c.methodUnavailable}</strong>
+          <small>
+            {current.payment?.paidAt
+              ? c.paidAt(shortDate(current.payment.paidAt, language))
+              : c.notPaidYet}
+          </small>
+        </article>
+      </div>
       <div className="order-detail-grid">
         <article>
           <strong>{c.customer}</strong>
@@ -608,68 +751,63 @@ function OrderDetailPanel({
           <small>{current.user?.phone ?? c.noPhone}</small>
         </article>
         <article>
-          <strong>{c.delivery}</strong>
-          <span>{c.shippingLabels[current.shippingMethod]}</span>
-          <small>
-            {current.trackingNumber ? (
-              <button className="text-copy-button" type="button" onClick={() => copyText(current.trackingNumber!, c)}>
-                {current.trackingNumber} <Copy size={12} aria-hidden="true" />
-              </button>
-            ) : (
-              c.noTracking
-            )}
-          </small>
-          <small>{current.address ? `${current.address.city}, ${current.address.province}` : c.noAddress}</small>
-        </article>
-        <article>
-          <strong>{c.payment}</strong>
-          <span>{c.paymentLabels[current.paymentStatus]}</span>
-          <small>{current.payment?.method ?? current.payment?.provider ?? c.methodUnavailable}</small>
-          <small>{current.payment?.paidAt ? c.paidAt(shortDate(current.payment.paidAt, language)) : c.notPaidYet}</small>
-        </article>
-        <article>
           <strong>{c.cancellation}</strong>
           <span>{current.status === "CANCELLED" ? c.cancelledLabel : c.notCancelled}</span>
           <small>{current.cancelReason ?? c.noCancellationReason}</small>
           <small>{current.cancelledAt ? c.cancelledAt(shortDate(current.cancelledAt, language)) : c.noCancellationTime}</small>
         </article>
-        <article>
-          <strong>{c.totals}</strong>
-          <span>{money(current.total)}</span>
-          <small>{c.subtotalShipping(money(current.subtotal), money(current.shippingCost))}</small>
-          <small>{current.voucher?.code ? c.voucher(current.voucher.code) : c.discount(money(current.discount))}</small>
-        </article>
       </div>
       {current.address && (
-        <div className="order-address-block">
-          <strong>{current.address.recipient}</strong>
-          <span>{current.address.fullAddress}, {current.address.district}, {current.address.city}, {current.address.province} {current.address.postalCode}</span>
+        <div className="order-detail-section order-address-block">
+          <div className="order-section-heading">
+            <strong>{c.address}</strong>
+            <span>{current.address.city}, {current.address.province}</span>
+          </div>
+          <p>
+            {current.address.fullAddress}, {current.address.district}, {current.address.city}, {current.address.province} {current.address.postalCode}
+          </p>
+          <small>{current.address.recipient} · {current.address.phone}</small>
         </div>
       )}
-      <div className="order-items-list">
-        {(current.items ?? []).length === 0 ? (
-          <p className="copy-block">{c.itemsUnavailable}</p>
-        ) : (
-          current.items?.map((item) => (
-            <article key={item.id}>
-              {item.productImage && (
-                <img src={normalizeAssetUrl(item.productImage)} alt="" loading="lazy" />
-              )}
-              <span>
-                <strong>{item.productName}</strong>
-                <small>{item.variantName} · {item.quantity}x</small>
-              </span>
-              <strong>{money(item.subtotal)}</strong>
-            </article>
-          ))
-        )}
+      <div className="order-detail-section">
+        <div className="order-section-heading">
+          <strong>{c.items}</strong>
+          <span>{c.itemsCount(itemCount)}</span>
+        </div>
+        <div className="order-items-list">
+          {(current.items ?? []).length === 0 ? (
+            <p className="copy-block">{c.itemsUnavailable}</p>
+          ) : (
+            current.items?.map((item) => (
+              <article key={item.id}>
+                {item.productImage ? (
+                  <img src={normalizeAssetUrl(item.productImage)} alt="" loading="lazy" />
+                ) : (
+                  <span className="order-item-thumb-empty" aria-hidden="true">
+                    {item.productName.slice(0, 1).toUpperCase()}
+                  </span>
+                )}
+                <span className="order-item-copy">
+                  <strong title={item.productName}>{item.productName}</strong>
+                  <small>{item.variantName} · {item.quantity}x</small>
+                </span>
+                <strong className="order-item-total">{money(item.subtotal)}</strong>
+              </article>
+            ))
+          )}
+        </div>
       </div>
-      <div className="order-timeline">
-        <TimelinePoint label={c.timeline.created} value={current.createdAt} language={language} />
-        <TimelinePoint label={c.timeline.paid} value={current.paidAt ?? current.payment?.paidAt} language={language} />
-        <TimelinePoint label={c.timeline.shipped} value={current.shippedAt} language={language} />
-        <TimelinePoint label={c.timeline.delivered} value={current.deliveredAt} language={language} />
-        <TimelinePoint label={c.timeline.cancelled} value={current.cancelledAt} language={language} />
+      <div className="order-detail-section">
+        <div className="order-section-heading">
+          <strong>{c.timelineTitle}</strong>
+        </div>
+        <div className="order-timeline">
+          <TimelinePoint label={c.timeline.created} value={current.createdAt} language={language} />
+          <TimelinePoint label={c.timeline.paid} value={current.paidAt ?? current.payment?.paidAt} language={language} />
+          <TimelinePoint label={c.timeline.shipped} value={current.shippedAt} language={language} />
+          <TimelinePoint label={c.timeline.delivered} value={current.deliveredAt} language={language} />
+          <TimelinePoint label={c.timeline.cancelled} value={current.cancelledAt} language={language} />
+        </div>
       </div>
     </section>
   );
@@ -698,5 +836,39 @@ function TimelinePoint({
       <strong>{label}</strong>
       <small>{value ? shortDate(value, language) : "-"}</small>
     </span>
+  );
+}
+
+function OrderStatusMenu({
+  order,
+  statuses,
+  disabled,
+  c,
+  onMove,
+}: {
+  order: Order;
+  statuses: OrderStatus[];
+  disabled: boolean;
+  c: OrdersCopy;
+  onMove: (status: OrderStatus) => void;
+}) {
+  return (
+    <SelectMenu
+      className="order-status-menu"
+      menuClassName="order-status-menu-list"
+      optionClassName="order-status-menu-option"
+      value={order.status}
+      options={statuses.map((status) => ({
+        value: status,
+        label: c.statusLabels[status],
+      }))}
+      triggerLabel={c.statusLabels[order.status]}
+      disabled={disabled}
+      ariaLabel={c.updateStatus(order.orderNumber)}
+      onChange={(value) => onMove(value as OrderStatus)}
+      renderOption={(option) => (
+        <Badge tone={orderTone(option.value as OrderStatus)}>{option.label}</Badge>
+      )}
+    />
   );
 }
