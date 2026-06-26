@@ -156,7 +156,10 @@ export function SelectMenu({
           else setOpen(true);
         }}
         onKeyDown={(event) => {
-          if (event.key === "Escape") closeMenu();
+          if (event.key === "Escape" && open) {
+            event.stopPropagation();
+            closeMenu();
+          }
           if (event.key === "ArrowDown") setOpen(true);
         }}
       >
@@ -184,7 +187,10 @@ export function SelectMenu({
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === "Escape") closeMenu();
+                  if (event.key === "Escape") {
+                    event.stopPropagation();
+                    closeMenu();
+                  }
                 }}
                 placeholder={searchPlaceholder}
               />

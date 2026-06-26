@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Copy, Eye, Search, X, XCircle } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Badge, orderTone, paymentTone } from "../components/Badge";
@@ -391,6 +391,26 @@ export function OrdersPage() {
       request<Paginated<Order>>(`/orders?${ordersPath.toString()}`, { token, signal }),
     placeholderData: (previousData) => previousData,
   });
+  const orderTotalPages = Math.max(ordersQuery.data?.meta.totalPages ?? 1, 1);
+  useEffect(() => {
+    if (
+      !ordersQuery.data ||
+      ordersQuery.isPlaceholderData ||
+      page <= orderTotalPages
+    ) {
+      return;
+    }
+    const next = new URLSearchParams(searchParams);
+    next.set("page", String(orderTotalPages));
+    setSearchParams(next, { replace: true });
+  }, [
+    page,
+    orderTotalPages,
+    ordersQuery.data,
+    ordersQuery.isPlaceholderData,
+    searchParams,
+    setSearchParams,
+  ]);
   const statusMutation = useMutation({
     mutationFn: ({
       id,

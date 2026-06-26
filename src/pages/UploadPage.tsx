@@ -123,7 +123,7 @@ export function UploadPage() {
       );
     },
     onSuccess: (result) => {
-      setUploaded(result);
+      setUploaded((previous) => [...result, ...previous]);
       setFiles(null);
       if (inputRef.current) inputRef.current.value = "";
       toast.success(c.uploaded(result.length));

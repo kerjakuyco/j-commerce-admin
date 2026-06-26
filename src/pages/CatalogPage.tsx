@@ -11,7 +11,7 @@ import {
   Tags,
   Trash2,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -501,6 +501,29 @@ export function CatalogPage() {
       }),
     placeholderData: (previousData) => previousData,
   });
+  const productTotalPages = Math.max(
+    productsQuery.data?.meta.totalPages ?? 1,
+    1,
+  );
+  useEffect(() => {
+    if (
+      !productsQuery.data ||
+      productsQuery.isPlaceholderData ||
+      page <= productTotalPages
+    ) {
+      return;
+    }
+    const next = new URLSearchParams(searchParams);
+    next.set("page", String(productTotalPages));
+    setSearchParams(next, { replace: true });
+  }, [
+    page,
+    productTotalPages,
+    productsQuery.data,
+    productsQuery.isPlaceholderData,
+    searchParams,
+    setSearchParams,
+  ]);
 
   const setCatalogSort = (key: string, direction: SortChangeDirection) => {
     const next = new URLSearchParams(searchParams);

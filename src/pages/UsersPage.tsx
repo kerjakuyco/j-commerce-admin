@@ -188,6 +188,18 @@ export function UsersPage() {
     },
     placeholderData: (previousData) => previousData,
   });
+  const userTotalPages = Math.max(usersQuery.data?.meta.totalPages ?? 1, 1);
+  useEffect(() => {
+    if (
+      !usersQuery.data ||
+      usersQuery.isPlaceholderData ||
+      page <= userTotalPages
+    ) {
+      return;
+    }
+    const handle = window.setTimeout(() => setPage(userTotalPages), 0);
+    return () => window.clearTimeout(handle);
+  }, [page, userTotalPages, usersQuery.data, usersQuery.isPlaceholderData]);
   const setUserSort = (key: string, direction: SortChangeDirection) => {
     if (!direction) {
       setSortBy("");

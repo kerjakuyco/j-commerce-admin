@@ -368,6 +368,19 @@ describe("admin layout stress guardrails", () => {
     );
   });
 
+  it("corrects out-of-range pagination after filtered data loads", () => {
+    expect(catalogPage).toContain("productsQuery.isPlaceholderData");
+    expect(catalogPage).toContain('next.set("page", String(productTotalPages))');
+    expect(catalogPage).toContain("setSearchParams(next, { replace: true })");
+    expect(ordersPage).toContain("ordersQuery.isPlaceholderData");
+    expect(ordersPage).toContain('next.set("page", String(orderTotalPages))');
+    expect(ordersPage).toContain("setSearchParams(next, { replace: true })");
+    expect(vouchersPage).toContain("vouchersQuery.isPlaceholderData");
+    expect(vouchersPage).toContain("setPage(voucherTotalPages)");
+    expect(usersPage).toContain("usersQuery.isPlaceholderData");
+    expect(usersPage).toContain("setPage(userTotalPages)");
+  });
+
   it("gives the catalog table and edit forms enough workspace", () => {
     expect(catalogPage).toContain('className="catalog-table-panel"');
     expect(catalogPage).toContain("<ActionSheet");
@@ -662,6 +675,7 @@ describe("admin layout stress guardrails", () => {
     expect(notificationsPage).toContain('className="broadcast-panel"');
     expect(uploadPage).toContain('className="upload-main-panel"');
     expect(uploadPage).toContain('className="upload-urls-panel"');
+    expect(uploadPage).toContain("setUploaded((previous) => [...result, ...previous])");
     expect(shell).toContain('"workspace workspace-messages"');
     expect(shell).toContain('"workspace workspace-upload"');
     expect(notificationsPage).toContain('className="control-form broadcast-form"');
@@ -721,6 +735,7 @@ describe("admin layout stress guardrails", () => {
     expect(vouchersPage).toContain("return { ...data, fetchedAt: Date.now() }");
     expect(vouchersPage).toContain("const statusNow = vouchersQuery.data?.fetchedAt ?? 0");
     expect(vouchersPage).not.toContain("const statusNow = vouchersQuery.dataUpdatedAt");
+    expect(vouchersPage).toContain(": new Date().toISOString()");
     expect(vouchersPage).toContain("voucherSortKeys");
     expect(vouchersPage).toContain("sort={{ key: sortBy, direction: sortDir, onSort: setVoucherSort }}");
     expect(vouchersPage).toContain("placeholderData: (previousData) => previousData");
@@ -781,6 +796,7 @@ describe("admin layout stress guardrails", () => {
     expect(selectMenu).toContain("searchable = false");
     expect(selectMenu).toContain("visibleOptions");
     expect(selectMenu).toContain("const closeMenu = () =>");
+    expect(selectMenu).toContain("event.stopPropagation()");
     expect(selectMenu).toContain('className="select-menu-search"');
     expect(selectMenu).toContain('className="select-menu-empty"');
     expect(selectMenu).toContain("window.addEventListener(\"resize\", updatePlacement)");

@@ -388,6 +388,26 @@ export function VouchersPage() {
     },
     placeholderData: (previousData) => previousData,
   });
+  const voucherTotalPages = Math.max(
+    vouchersQuery.data?.meta.totalPages ?? 1,
+    1,
+  );
+  useEffect(() => {
+    if (
+      !vouchersQuery.data ||
+      vouchersQuery.isPlaceholderData ||
+      page <= voucherTotalPages
+    ) {
+      return;
+    }
+    const handle = window.setTimeout(() => setPage(voucherTotalPages), 0);
+    return () => window.clearTimeout(handle);
+  }, [
+    page,
+    voucherTotalPages,
+    vouchersQuery.data,
+    vouchersQuery.isPlaceholderData,
+  ]);
   const setVoucherSort = (key: string, direction: SortChangeDirection) => {
     if (!direction) {
       setSortBy("");
@@ -934,7 +954,9 @@ function voucherPayload(values: VoucherForm) {
   return {
     ...values,
     code: values.code.toUpperCase(),
-    startsAt: values.startsAt ? new Date(values.startsAt).toISOString() : undefined,
+    startsAt: values.startsAt
+      ? new Date(values.startsAt).toISOString()
+      : new Date().toISOString(),
     expiresAt: values.expiresAt
       ? new Date(values.expiresAt).toISOString()
       : values.expiresAt,
