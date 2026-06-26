@@ -3,7 +3,12 @@ import { Power, PowerOff, Search, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "../components/Badge";
-import { DataTable } from "../components/DataTable";
+import {
+  DataTable,
+  type ColumnDef,
+  type SortChangeDirection,
+  type SortDirection,
+} from "../components/DataTable";
 import { ErrorState } from "../components/ErrorState";
 import { LoadingState } from "../components/LoadingState";
 import { PaginationStrip } from "../components/PaginationStrip";
@@ -29,7 +34,7 @@ type UsersCopy = {
   allStatuses: string;
   reset: string;
   tableCaption: string;
-  columns: string[];
+  columns: ColumnDef[];
   active: string;
   disabled: string;
   protectedAria: (email: string) => string;
@@ -50,6 +55,8 @@ const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 const DEFAULT_PAGE_SIZE = 25;
 const userRoleFilters: UserRole[] = ["ADMIN", "CUSTOMER"];
 type UserStatusFilter = "" | "active" | "disabled";
+const userSortKeys = ["name", "email", "role", "createdAt", "isActive"] as const;
+type UserSortKey = (typeof userSortKeys)[number];
 
 const copy: Record<Language, UsersCopy> = {
   en: {
@@ -66,9 +73,16 @@ const copy: Record<Language, UsersCopy> = {
     allStatuses: "All statuses",
     reset: "Reset",
     tableCaption: "Customer access table",
-    columns: ["Name", "Email", "Role", "Joined", "Status", "Action"],
-    active: "ACTIVE",
-    disabled: "DISABLED",
+    columns: [
+      { label: "Name", key: "name", sortable: true, defaultSortDirection: "asc" },
+      { label: "Email", key: "email", sortable: true, defaultSortDirection: "asc" },
+      { label: "Role", key: "role", sortable: true, defaultSortDirection: "asc" },
+      { label: "Joined", key: "joined", sortKey: "createdAt", sortable: true },
+      { label: "Status", key: "status", sortKey: "isActive", sortable: true },
+      { label: "Action", key: "action" },
+    ],
+    active: "Active",
+    disabled: "Inactive",
     protectedAria: (email) => `${email} is protected`,
     toggleAria: (action, email) => `${action} ${email}`,
     confirmDisable: (email) => `Disable access for ${email}?`,
@@ -96,15 +110,22 @@ const copy: Record<Language, UsersCopy> = {
     allStatuses: "Semua status",
     reset: "Reset",
     tableCaption: "Tabel akses pelanggan",
-    columns: ["Nama", "Email", "Role", "Bergabung", "Status", "Aksi"],
-    active: "ACTIVE",
-    disabled: "DISABLED",
+    columns: [
+      { label: "Nama", key: "name", sortable: true, defaultSortDirection: "asc" },
+      { label: "Email", key: "email", sortable: true, defaultSortDirection: "asc" },
+      { label: "Role", key: "role", sortable: true, defaultSortDirection: "asc" },
+      { label: "Bergabung", key: "joined", sortKey: "createdAt", sortable: true },
+      { label: "Status", key: "status", sortKey: "isActive", sortable: true },
+      { label: "Aksi", key: "action" },
+    ],
+    active: "Active",
+    disabled: "Inactive",
     protectedAria: (email) => `${email} dilindungi`,
     toggleAria: (action, email) => `${action} ${email}`,
     confirmDisable: (email) => `Nonaktifkan akses untuk ${email}?`,
-    protectedTitle: "Protected",
-    disable: "Disable",
-    enable: "Enable",
+    protectedTitle: "Dilindungi",
+    disable: "Nonaktifkan",
+    enable: "Aktifkan",
     paginationLabel: "Pagination tabel pelanggan",
     rowsPerPage: "Baris per halaman",
     previous: "Sebelumnya",
@@ -124,8 +145,12 @@ export function UsersPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<"" | UserRole>("");
   const [statusFilter, setStatusFilter] = useState<UserStatusFilter>("");
+  const [sortBy, setSortBy] = useState<UserSortKey | "">("");
+  const [sortDir, setSortDir] = useState<SortDirection>("desc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const effectiveSortBy = sortBy || "createdAt";
+  const effectiveSortDir = sortBy ? sortDir : "desc";
   // useDeferredValue is not a debounce; use a 250ms timer so typing doesn't
   // fire a request on every keystroke.
   useEffect(() => {
@@ -136,7 +161,16 @@ export function UsersPage() {
     return () => window.clearTimeout(handle);
   }, [search]);
   const usersQuery = useQuery({
-    queryKey: ["users", debouncedSearch.trim(), roleFilter, statusFilter, page, pageSize],
+    queryKey: [
+      "users",
+      debouncedSearch.trim(),
+      roleFilter,
+      statusFilter,
+      effectiveSortBy,
+      effectiveSortDir,
+      page,
+      pageSize,
+    ],
     queryFn: ({ signal }) => {
       const params = new URLSearchParams({
         limit: String(pageSize),
@@ -145,6 +179,8 @@ export function UsersPage() {
       if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
       if (roleFilter) params.set("role", roleFilter);
       if (statusFilter) params.set("isActive", statusFilter === "active" ? "true" : "false");
+      params.set("sortBy", effectiveSortBy);
+      params.set("sortDir", effectiveSortDir);
       return request<Paginated<User>>(`/users?${params.toString()}`, {
         token,
         signal,
@@ -152,6 +188,18 @@ export function UsersPage() {
     },
     placeholderData: (previousData) => previousData,
   });
+  const setUserSort = (key: string, direction: SortChangeDirection) => {
+    if (!direction) {
+      setSortBy("");
+      setSortDir("desc");
+      setPage(1);
+      return;
+    }
+    if (!(userSortKeys as readonly string[]).includes(key)) return;
+    setSortBy(key as UserSortKey);
+    setSortDir(direction);
+    setPage(1);
+  };
   const toggleMutation = useMutation({
     mutationFn: (user: User) =>
       request<User>(`/users/${user.id}/active`, {
@@ -177,6 +225,7 @@ export function UsersPage() {
       headerMeta={c.usersCount(
         usersQuery.data?.meta.total ?? usersQuery.data?.data.length ?? 0,
       )}
+      className="users-list-panel"
     >
       <div className="catalog-toolbar users-toolbar" aria-label={c.filtersLabel}>
         <label htmlFor="user-search">
@@ -236,6 +285,8 @@ export function UsersPage() {
             setDebouncedSearch("");
             setRoleFilter("");
             setStatusFilter("");
+            setSortBy("");
+            setSortDir("desc");
             setPage(1);
           }}
         >
@@ -245,6 +296,7 @@ export function UsersPage() {
       <DataTable
         caption={c.tableCaption}
         columns={c.columns}
+        sort={{ key: sortBy, direction: sortDir, onSort: setUserSort }}
         rows={(usersQuery.data?.data ?? []).map((user) => {
           const protectedUser =
             user.role === "ADMIN" || user.id === session?.user.id;
@@ -261,7 +313,7 @@ export function UsersPage() {
             </Badge>,
             <button
               key={user.id}
-              className={`icon-button${user.isActive && !protectedUser ? " icon-button-danger" : ""}`}
+              className={`icon-button${user.isActive && !protectedUser ? " icon-button-destructive-glyph" : ""}`}
               type="button"
               aria-label={
                 protectedUser

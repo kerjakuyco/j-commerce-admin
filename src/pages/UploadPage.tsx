@@ -176,7 +176,7 @@ export function UploadPage() {
 
   return (
     <div className="upload-layout">
-      <Panel title={c.title} eyebrow={c.eyebrow}>
+      <Panel title={c.title} eyebrow={c.eyebrow} className="upload-main-panel">
         <div
           className="dropzone"
           onDragOver={(event) => event.preventDefault()}
@@ -252,7 +252,11 @@ export function UploadPage() {
           </div>
         </div>
       </Panel>
-      <Panel title={c.urlsTitle} eyebrow={c.assets(uploaded.length)}>
+      <Panel
+        title={c.urlsTitle}
+        eyebrow={c.assets(uploaded.length)}
+        className="upload-urls-panel"
+      >
         <div className="asset-list">
           {uploaded.length === 0 ? (
             <div className="asset-list-empty">

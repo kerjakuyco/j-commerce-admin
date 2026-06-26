@@ -229,6 +229,7 @@ export function DashboardPage() {
                   />
                   <Bar
                     dataKey="count"
+                    fillOpacity={0.92}
                     radius={[0, 8, 8, 0]}
                   >
                     {breakdown.map((item) => (
@@ -412,12 +413,22 @@ export function DashboardPage() {
 }
 
 function statusBarFill(status: OrderStatusBreakdown["status"]) {
-  const tone = orderTone(status);
-  if (tone === "good") return "var(--green)";
-  if (tone === "warn") return "var(--yellow)";
-  if (tone === "danger") return "var(--red)";
-  if (tone === "hot") return "var(--primary)";
-  return "var(--line-strong)";
+  switch (status) {
+    case "PENDING":
+      return "var(--chart-order-pending)";
+    case "PAID":
+      return "var(--chart-order-paid)";
+    case "PACKED":
+      return "var(--chart-order-packed)";
+    case "SHIPPED":
+      return "var(--chart-order-shipped)";
+    case "DELIVERED":
+      return "var(--chart-order-delivered)";
+    case "CANCELLED":
+      return "var(--chart-order-cancelled)";
+    default:
+      return "var(--chart-order-fallback)";
+  }
 }
 
 function growthLabel(value: number | undefined, suffix: string, language: "en" | "id") {

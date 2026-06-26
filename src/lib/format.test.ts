@@ -58,9 +58,12 @@ describe("format utilities", () => {
 
 describe("status badge tones", () => {
   it("keeps order and payment tones aligned with API statuses", () => {
-    expect(orderTone("PAID")).toBe("good");
-    expect(orderTone("PENDING")).toBe("warn");
-    expect(orderTone("CANCELLED")).toBe("danger");
+    expect(orderTone("PENDING")).toBe("order-pending");
+    expect(orderTone("PAID")).toBe("order-paid");
+    expect(orderTone("PACKED")).toBe("order-packed");
+    expect(orderTone("SHIPPED")).toBe("order-shipped");
+    expect(orderTone("DELIVERED")).toBe("order-delivered");
+    expect(orderTone("CANCELLED")).toBe("order-cancelled");
     expect(paymentTone("UNPAID")).toBe("warn");
     expect(paymentTone("FAILED")).toBe("danger");
     expect(paymentTone("REFUNDED")).toBe("neutral");

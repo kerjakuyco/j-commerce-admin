@@ -4,7 +4,12 @@ import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Badge, orderTone, paymentTone } from "../components/Badge";
-import { DataTable } from "../components/DataTable";
+import {
+  DataTable,
+  type ColumnDef,
+  type SortChangeDirection,
+  type SortDirection,
+} from "../components/DataTable";
 import { ErrorState } from "../components/ErrorState";
 import { LoadingState } from "../components/LoadingState";
 import { PaginationStrip } from "../components/PaginationStrip";
@@ -24,6 +29,7 @@ import {
 } from "../lib/constants";
 import { request } from "../lib/api";
 import { money, readError, shortDate } from "../lib/format";
+import { useDebouncedSearchParam } from "../lib/useDebouncedSearchParam";
 import type {
   Order,
   OrderStatus,
@@ -35,6 +41,22 @@ import type {
 const CANCELLABLE_STATUSES: OrderStatus[] = ["PENDING", "PAID"];
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 const DEFAULT_PAGE_SIZE = 25;
+const orderSortKeys = [
+  "orderNumber",
+  "createdAt",
+  "status",
+  "paymentStatus",
+  "total",
+] as const;
+type OrderSortKey = (typeof orderSortKeys)[number];
+
+function isOrderSortKey(value: string): value is OrderSortKey {
+  return (orderSortKeys as readonly string[]).includes(value);
+}
+
+function isSortDirection(value: string): value is SortDirection {
+  return value === "asc" || value === "desc";
+}
 
 type OrdersCopy = {
   updated: string;
@@ -53,7 +75,7 @@ type OrdersCopy = {
   reset: string;
   ordersCount: (count: number) => string;
   tableCaption: string;
-  columns: { label: string; key: string }[];
+  columns: ColumnDef[];
   itemsCount: (count: number) => string;
   viewOrder: (orderNumber: string) => string;
   viewDetails: string;
@@ -125,12 +147,12 @@ const copy: Record<Language, OrdersCopy> = {
     ordersCount: (count) => `${count} ${count === 1 ? "order" : "orders"}`,
     tableCaption: "Order management table",
     columns: [
-      { label: "Invoice", key: "invoice" },
+      { label: "Invoice", key: "invoice", sortKey: "orderNumber", sortable: true },
       { label: "Customer", key: "customer" },
-      { label: "Date", key: "date" },
-      { label: "Status", key: "status" },
-      { label: "Payment", key: "payment" },
-      { label: "Total", key: "total" },
+      { label: "Date", key: "date", sortKey: "createdAt", sortable: true },
+      { label: "Status", key: "status", sortable: true },
+      { label: "Payment", key: "payment", sortKey: "paymentStatus", sortable: true },
+      { label: "Total", key: "total", sortable: true },
       { label: "Move", key: "move" },
     ],
     itemsCount: (count) => `${count} item${count === 1 ? "" : "s"}`,
@@ -226,12 +248,12 @@ const copy: Record<Language, OrdersCopy> = {
     ordersCount: (count) => `${count} pesanan`,
     tableCaption: "Tabel manajemen pesanan",
     columns: [
-      { label: "Invoice", key: "invoice" },
+      { label: "Invoice", key: "invoice", sortKey: "orderNumber", sortable: true },
       { label: "Pelanggan", key: "customer" },
-      { label: "Tanggal", key: "date" },
-      { label: "Status", key: "status" },
-      { label: "Pembayaran", key: "payment" },
-      { label: "Total", key: "total" },
+      { label: "Tanggal", key: "date", sortKey: "createdAt", sortable: true },
+      { label: "Status", key: "status", sortable: true },
+      { label: "Pembayaran", key: "payment", sortKey: "paymentStatus", sortable: true },
+      { label: "Total", key: "total", sortable: true },
       { label: "Aksi", key: "move" },
     ],
     itemsCount: (count) => `${count} item`,
@@ -289,18 +311,18 @@ const copy: Record<Language, OrdersCopy> = {
       cancelled: "Dibatalkan",
     },
     statusLabels: {
-      PENDING: "Pending",
-      PAID: "Paid",
-      PACKED: "Packed",
-      SHIPPED: "Shipped",
-      DELIVERED: "Delivered",
-      CANCELLED: "Cancelled",
+      PENDING: "Menunggu",
+      PAID: "Dibayar",
+      PACKED: "Dikemas",
+      SHIPPED: "Dikirim",
+      DELIVERED: "Selesai",
+      CANCELLED: "Dibatalkan",
     },
     paymentLabels: {
-      UNPAID: "Unpaid",
-      PAID: "Paid",
-      REFUNDED: "Refunded",
-      FAILED: "Failed",
+      UNPAID: "Belum bayar",
+      PAID: "Dibayar",
+      REFUNDED: "Dikembalikan",
+      FAILED: "Gagal",
       EXPIRED: "Expired",
     },
     shippingLabels: {
@@ -319,9 +341,16 @@ export function OrdersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const searchFilter = searchParams.get("search") ?? "";
+  const [orderSearchDraft, setOrderSearchDraft] = useDebouncedSearchParam({
+    value: searchFilter,
+    searchParams,
+    setSearchParams,
+  });
   const statusParam = searchParams.get("status") ?? "";
   const paymentStatusParam = searchParams.get("paymentStatus") ?? "";
   const shippingMethodParam = searchParams.get("shippingMethod") ?? "";
+  const sortByParam = searchParams.get("sortBy") ?? "";
+  const sortDirParam = searchParams.get("sortDir") ?? "";
   const pageParam = Number(searchParams.get("page") ?? "1");
   const pageSizeParam = Number(searchParams.get("limit") ?? String(DEFAULT_PAGE_SIZE));
   const statusFilter = isOrderStatus(statusParam) ? statusParam : "";
@@ -335,11 +364,17 @@ export function OrdersPage() {
   const pageSize = PAGE_SIZE_OPTIONS.includes(pageSizeParam)
     ? pageSizeParam
     : DEFAULT_PAGE_SIZE;
+  const visibleSortBy = isOrderSortKey(sortByParam) ? sortByParam : "";
+  const visibleSortDir = isSortDirection(sortDirParam) ? sortDirParam : "desc";
+  const sortBy = visibleSortBy || "createdAt";
+  const sortDir = visibleSortBy ? visibleSortDir : "desc";
   const ordersPath = new URLSearchParams({ limit: String(pageSize), page: String(page) });
   if (searchFilter.trim()) ordersPath.set("search", searchFilter.trim());
   if (statusFilter) ordersPath.set("status", statusFilter);
   if (paymentStatusFilter) ordersPath.set("paymentStatus", paymentStatusFilter);
   if (shippingMethodFilter) ordersPath.set("shippingMethod", shippingMethodFilter);
+  ordersPath.set("sortBy", sortBy);
+  ordersPath.set("sortDir", sortDir);
   const ordersQuery = useQuery({
     queryKey: [
       "orders",
@@ -347,11 +382,14 @@ export function OrdersPage() {
       statusFilter,
       paymentStatusFilter,
       shippingMethodFilter,
+      sortBy,
+      sortDir,
       page,
       pageSize,
     ],
     queryFn: ({ signal }) =>
       request<Paginated<Order>>(`/orders?${ordersPath.toString()}`, { token, signal }),
+    placeholderData: (previousData) => previousData,
   });
   const statusMutation = useMutation({
     mutationFn: ({
@@ -398,6 +436,19 @@ export function OrdersPage() {
     const next = new URLSearchParams(searchParams);
     if (value) next.set(key, value);
     else next.delete(key);
+    next.set("page", "1");
+    setSearchParams(next);
+  };
+
+  const setOrderSort = (key: string, direction: SortChangeDirection) => {
+    const next = new URLSearchParams(searchParams);
+    if (direction) {
+      next.set("sortBy", key);
+      next.set("sortDir", direction);
+    } else {
+      next.delete("sortBy");
+      next.delete("sortDir");
+    }
     next.set("page", "1");
     setSearchParams(next);
   };
@@ -451,6 +502,11 @@ export function OrdersPage() {
       title={c.title}
       eyebrow={c.eyebrow}
       headerMeta={c.ordersCount(ordersQuery.data?.meta.total ?? 0)}
+      className={
+        selectedOrderId
+          ? "orders-list-panel orders-list-panel-with-detail"
+          : "orders-list-panel"
+      }
     >
       <div className="orders-toolbar" aria-label={c.filtersLabel}>
         <label htmlFor="order-search">
@@ -462,8 +518,8 @@ export function OrdersPage() {
               name="search"
               type="search"
               autoComplete="off"
-              value={searchFilter}
-              onChange={(event) => setOrderParam("search", event.target.value)}
+              value={orderSearchDraft}
+              onChange={(event) => setOrderSearchDraft(event.target.value)}
               placeholder={c.searchPlaceholder}
             />
           </span>
@@ -524,6 +580,7 @@ export function OrdersPage() {
       <DataTable
         caption={c.tableCaption}
         columns={c.columns}
+        sort={{ key: visibleSortBy, direction: visibleSortDir, onSort: setOrderSort }}
         keyExtractor={(_row, index) =>
           ordersQuery.data?.data[index]?.id ?? index
         }

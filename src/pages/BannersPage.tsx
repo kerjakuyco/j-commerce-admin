@@ -1,10 +1,19 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ImageOff, Megaphone, Pencil, Power, Search, Trash2 } from "lucide-react";
+import {
+  ImageOff,
+  Megaphone,
+  Pencil,
+  Power,
+  PowerOff,
+  Search,
+  Trash2,
+} from "lucide-react";
 import { useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
+import { ActionSheet } from "../components/ActionSheet";
 import { ErrorState } from "../components/ErrorState";
 import { ImageUploadButton } from "../components/ImageUploadButton";
 import { LoadingState } from "../components/LoadingState";
@@ -50,6 +59,7 @@ type BannerCopy = {
   created: string;
   updated: string;
   deactivated: string;
+  deleted: string;
   statusUpdated: string;
   listTitle: string;
   listEyebrow: string;
@@ -70,9 +80,12 @@ type BannerCopy = {
   edit: string;
   editBanner: (title: string) => string;
   deactivate: string;
-  activate: string;
-  toggleBanner: (action: string, title: string) => string;
-  confirmDeactivate: (title: string) => string;
+  reactivate: string;
+  deactivateBanner: (title: string) => string;
+  reactivateBanner: (title: string) => string;
+  deletePermanent: string;
+  deletePermanentBanner: (title: string) => string;
+  confirmDeletePermanent: (title: string) => string;
   formTitleCreate: string;
   formTitleEdit: string;
   formEyebrow: string;
@@ -82,6 +95,7 @@ type BannerCopy = {
   sortOrder: string;
   activeHelp: string;
   publish: string;
+  publishDialog: string;
   update: string;
   cancel: string;
   previewHint: string;
@@ -93,6 +107,7 @@ const copy: Record<Language, BannerCopy> = {
     created: "Banner created",
     updated: "Banner updated",
     deactivated: "Banner deactivated",
+    deleted: "Banner permanently deleted",
     statusUpdated: "Banner status updated",
     listTitle: "Home banners",
     listEyebrow: "visual merchandising",
@@ -113,9 +128,13 @@ const copy: Record<Language, BannerCopy> = {
     edit: "Edit",
     editBanner: (title: string) => `Edit banner ${title}`,
     deactivate: "Deactivate",
-    activate: "Activate",
-    toggleBanner: (action: string, title: string) => `${action} banner ${title}`,
-    confirmDeactivate: (title: string) => `Deactivate banner ${title}?`,
+    reactivate: "Reactivate",
+    deactivateBanner: (title: string) => `Deactivate banner ${title}`,
+    reactivateBanner: (title: string) => `Reactivate banner ${title}`,
+    deletePermanent: "Delete permanently",
+    deletePermanentBanner: (title: string) => `Delete banner ${title} permanently`,
+    confirmDeletePermanent: (title: string) =>
+      `Permanently delete banner "${title}"? This cannot be undone.`,
     formTitleCreate: "Create banner",
     formTitleEdit: "Edit banner",
     formEyebrow: "campaign surface",
@@ -125,8 +144,9 @@ const copy: Record<Language, BannerCopy> = {
     sortOrder: "Sort order",
     activeHelp: "Inactive banners are hidden from the home carousel.",
     publish: "Publish banner",
+    publishDialog: "Publish",
     update: "Update banner",
-    cancel: "Cancel edit",
+    cancel: "Cancel",
     previewHint: "Preview appears after a valid asset URL.",
     preview: "Banner preview",
   },
@@ -134,6 +154,7 @@ const copy: Record<Language, BannerCopy> = {
     created: "Banner dibuat",
     updated: "Banner diperbarui",
     deactivated: "Banner dinonaktifkan",
+    deleted: "Banner dihapus permanen",
     statusUpdated: "Status banner diperbarui",
     listTitle: "Home Banner",
     listEyebrow: "visual merchandising",
@@ -154,9 +175,13 @@ const copy: Record<Language, BannerCopy> = {
     edit: "Edit",
     editBanner: (title: string) => `Edit banner ${title}`,
     deactivate: "Nonaktifkan",
-    activate: "Aktifkan",
-    toggleBanner: (action: string, title: string) => `${action} banner ${title}`,
-    confirmDeactivate: (title: string) => `Nonaktifkan banner ${title}?`,
+    reactivate: "Aktifkan",
+    deactivateBanner: (title: string) => `Nonaktifkan banner ${title}`,
+    reactivateBanner: (title: string) => `Aktifkan banner ${title}`,
+    deletePermanent: "Hapus permanen",
+    deletePermanentBanner: (title: string) => `Hapus permanen banner ${title}`,
+    confirmDeletePermanent: (title: string) =>
+      `Hapus permanen banner "${title}"? Aksi ini tidak bisa dibatalkan.`,
     formTitleCreate: "Buat banner",
     formTitleEdit: "Edit banner",
     formEyebrow: "area campaign",
@@ -166,8 +191,9 @@ const copy: Record<Language, BannerCopy> = {
     sortOrder: "Urutan tampil",
     activeHelp: "Banner nonaktif disembunyikan dari carousel home.",
     publish: "Publish banner",
+    publishDialog: "Publish",
     update: "Perbarui banner",
-    cancel: "Batal edit",
+    cancel: "Batal",
     previewHint: "Preview muncul setelah URL aset valid.",
     preview: "Preview banner",
   },
@@ -179,6 +205,8 @@ export function BannersPage() {
   const c = copy[language];
   const queryClient = useQueryClient();
   const [editingBanner, setEditingBanner] = useState<Banner | null>(null);
+  const [deletingBanner, setDeletingBanner] = useState<Banner | null>(null);
+  const [bannerSheetOpen, setBannerSheetOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | "active" | "inactive">("");
   const bannersQuery = useQuery({
@@ -199,6 +227,7 @@ export function BannersPage() {
         body: JSON.stringify(bannerPayload(values)),
       }),
     onSuccess: async () => {
+      setBannerSheetOpen(false);
       setEditingBanner(null);
       form.reset(emptyBannerForm);
       await queryClient.invalidateQueries({ queryKey: ["banners"] });
@@ -214,6 +243,7 @@ export function BannersPage() {
         body: JSON.stringify(bannerPayload(values)),
       }),
     onSuccess: async () => {
+      setBannerSheetOpen(false);
       setEditingBanner(null);
       form.reset(emptyBannerForm);
       await queryClient.invalidateQueries({ queryKey: ["banners"] });
@@ -221,36 +251,39 @@ export function BannersPage() {
     },
     onError: (error) => toast.error(readError(error, language)),
   });
-  const deleteBanner = useMutation({
+  const toggleBanner = useMutation({
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
+      isActive
+        ? request<unknown>(`/banners/${id}`, {
+            token,
+            method: "PATCH",
+            body: JSON.stringify({ isActive: true }),
+          })
+        : request<unknown>(`/banners/${id}`, {
+            token,
+            method: "DELETE",
+          }),
+    onSuccess: async (_data, variables) => {
+      await queryClient.invalidateQueries({ queryKey: ["banners"] });
+      toast.success(variables.isActive ? c.statusUpdated : c.deactivated);
+    },
+    onError: (error) => toast.error(readError(error, language)),
+  });
+  const permanentDeleteBanner = useMutation({
     mutationFn: (id: string) =>
-      request(`/banners/${id}`, { token, method: "DELETE" }),
+      request(`/banners/${id}/permanent`, { token, method: "DELETE" }),
     onSuccess: async (_data, id) => {
+      setDeletingBanner(null);
       if (editingBanner?.id === id) {
+        setBannerSheetOpen(false);
         setEditingBanner(null);
         form.reset(emptyBannerForm);
       }
       await queryClient.invalidateQueries({ queryKey: ["banners"] });
-      toast.success(c.deactivated);
+      toast.success(c.deleted);
     },
     onError: (error) => toast.error(readError(error, language)),
   });
-  const toggleBanner = useMutation({
-    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
-      request<Banner>(`/banners/${id}`, {
-        token,
-        method: "PATCH",
-        body: JSON.stringify({ isActive }),
-      }),
-    onSuccess: async (_banner, variables) => {
-      if (editingBanner?.id === variables.id) {
-        form.setValue("isActive", variables.isActive);
-      }
-      await queryClient.invalidateQueries({ queryKey: ["banners"] });
-      toast.success(c.statusUpdated);
-    },
-    onError: (error) => toast.error(readError(error, language)),
-  });
-
   if (bannersQuery.isLoading) return <LoadingState />;
   if (bannersQuery.error)
     return <ErrorState message={readError(bannersQuery.error, language)} />;
@@ -267,15 +300,20 @@ export function BannersPage() {
   });
   const savingBanner = createBanner.isPending || updateBanner.isPending;
 
+  const startCreatingBanner = () => {
+    setEditingBanner(null);
+    form.reset(emptyBannerForm);
+    setBannerSheetOpen(true);
+  };
+
   const startEditingBanner = (banner: Banner) => {
     setEditingBanner(banner);
     form.reset(bannerToForm(banner));
-    document
-      .getElementById("banner-form")
-      ?.scrollIntoView({ block: "start", behavior: "smooth" });
+    setBannerSheetOpen(true);
   };
 
   const cancelEditingBanner = () => {
+    setBannerSheetOpen(false);
     setEditingBanner(null);
     form.reset(emptyBannerForm);
   };
@@ -366,60 +404,65 @@ export function BannersPage() {
                         <span>{c.imageUnavailable}</span>
                       </div>
                     )}
+                    <div className="banner-card-overlay">
+                      <span
+                        className={`badge ${banner.isActive ? "badge-good" : "badge-danger"}`}
+                      >
+                        {banner.isActive ? c.active : c.inactive}
+                      </span>
+                      <div className="banner-card-overlay-actions">
+                        <button
+                          className="icon-button"
+                          type="button"
+                          aria-label={c.editBanner(banner.title)}
+                          title={c.edit}
+                          onClick={() => startEditingBanner(banner)}
+                        >
+                          <Pencil size={16} aria-hidden="true" />
+                        </button>
+                        <button
+                          className={`icon-button${banner.isActive ? " icon-button-destructive-glyph" : ""}`}
+                          type="button"
+                          aria-label={
+                            banner.isActive
+                              ? c.deactivateBanner(banner.title)
+                              : c.reactivateBanner(banner.title)
+                          }
+                          title={banner.isActive ? c.deactivate : c.reactivate}
+                          disabled={toggleBanner.isPending}
+                          onClick={() =>
+                            toggleBanner.mutate({ id: banner.id, isActive: !banner.isActive })
+                          }
+                        >
+                          {banner.isActive ? (
+                            <PowerOff size={16} aria-hidden="true" />
+                          ) : (
+                            <Power size={16} aria-hidden="true" />
+                          )}
+                        </button>
+                        <button
+                          className="icon-button icon-button-danger"
+                          type="button"
+                          aria-label={c.deletePermanentBanner(banner.title)}
+                          title={c.deletePermanent}
+                          disabled={permanentDeleteBanner.isPending}
+                          onClick={() => setDeletingBanner(banner)}
+                        >
+                          <Trash2 size={16} aria-hidden="true" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                   <div className="banner-card-body">
                     <div className="banner-card-heading">
                       <strong title={banner.title}>{banner.title}</strong>
                     </div>
                     <div className="banner-meta">
-                      <span
-                        className={`badge ${banner.isActive ? "badge-good" : "badge-danger"}`}
-                      >
-                        {banner.isActive ? c.active : c.inactive}
-                      </span>
                       <span>{c.order} {banner.sortOrder}</span>
                       <span title={banner.link ?? undefined}>
                         {banner.link || c.noLink}
                       </span>
                     </div>
-                  </div>
-                  <div className="banner-actions">
-                    <button
-                      className="icon-button"
-                      type="button"
-                      aria-label={c.editBanner(banner.title)}
-                      title={c.edit}
-                      onClick={() => startEditingBanner(banner)}
-                    >
-                      <Pencil size={16} aria-hidden="true" />
-                    </button>
-                    <button
-                      className={`icon-button banner-action${banner.isActive ? " icon-button-danger" : ""}`}
-                      type="button"
-                      aria-label={c.toggleBanner(
-                        banner.isActive ? c.deactivate : c.activate,
-                        banner.title,
-                      )}
-                      title={banner.isActive ? c.deactivate : c.activate}
-                      disabled={deleteBanner.isPending || toggleBanner.isPending}
-                      onClick={() => {
-                        if (banner.isActive) {
-                          if (
-                            window.confirm(c.confirmDeactivate(banner.title))
-                          ) {
-                            deleteBanner.mutate(banner.id);
-                          }
-                        } else {
-                          toggleBanner.mutate({ id: banner.id, isActive: true });
-                        }
-                      }}
-                    >
-                      {banner.isActive ? (
-                        <Trash2 size={16} aria-hidden="true" />
-                      ) : (
-                        <Power size={16} aria-hidden="true" />
-                      )}
-                    </button>
                   </div>
                 </article>
               );
@@ -427,13 +470,28 @@ export function BannersPage() {
           )}
         </div>
       </Panel>
-      <Panel
+      <div className="panel-external-actions">
+        <button
+          className="primary-button"
+          type="button"
+          onClick={startCreatingBanner}
+        >
+          <Megaphone size={17} aria-hidden="true" />
+          {c.publish}
+        </button>
+      </div>
+      <ActionSheet
+        open={bannerSheetOpen}
         title={editingBanner ? c.formTitleEdit : c.formTitleCreate}
         eyebrow={editingBanner ? editingBanner.title : c.formEyebrow}
+        closeLabel={c.cancel}
+        onClose={() => {
+          if (!savingBanner) cancelEditingBanner();
+        }}
       >
         <form
           id="banner-form"
-          className="control-form"
+          className="control-form action-sheet-form"
           onSubmit={form.handleSubmit((values) =>
             editingBanner
               ? updateBanner.mutate({ id: editingBanner.id, values })
@@ -529,26 +587,60 @@ export function BannersPage() {
           </label>
           <div className="form-actions">
             <button
+              className="ghost-button"
+              type="button"
+              disabled={savingBanner}
+              onClick={cancelEditingBanner}
+            >
+              {c.cancel}
+            </button>
+            <button
               className="primary-button"
               type="submit"
               disabled={savingBanner}
             >
               <Megaphone size={17} />
-              {editingBanner ? c.update : c.publish}
+              {editingBanner ? c.update : c.publishDialog}
             </button>
-            {editingBanner && (
-              <button
-                className="ghost-button"
-                type="button"
-                disabled={savingBanner}
-                onClick={cancelEditingBanner}
-              >
-                {c.cancel}
-              </button>
-            )}
           </div>
         </form>
-      </Panel>
+      </ActionSheet>
+      <ActionSheet
+        open={Boolean(deletingBanner)}
+        title={c.deletePermanent}
+        eyebrow={deletingBanner?.title}
+        closeLabel={c.cancel}
+        onClose={() => {
+          if (!permanentDeleteBanner.isPending) setDeletingBanner(null);
+        }}
+      >
+        <div className="control-form action-sheet-form">
+          <p className="copy-block">
+            {deletingBanner ? c.confirmDeletePermanent(deletingBanner.title) : ""}
+          </p>
+          <div className="form-actions">
+            <button
+              className="ghost-button"
+              type="button"
+              disabled={permanentDeleteBanner.isPending}
+              onClick={() => setDeletingBanner(null)}
+            >
+              {c.cancel}
+            </button>
+            <button
+              className="danger-button"
+              type="button"
+              disabled={!deletingBanner || permanentDeleteBanner.isPending}
+              onClick={() => {
+                if (deletingBanner) permanentDeleteBanner.mutate(deletingBanner.id);
+              }}
+            >
+              <Trash2 size={17} aria-hidden="true" />
+              {c.deletePermanent}
+            </button>
+          </div>
+        </div>
+      </ActionSheet>
     </div>
   );
 }

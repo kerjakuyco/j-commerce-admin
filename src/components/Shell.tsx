@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { LanguageToggle } from "./LanguageToggle";
 import { ThemeToggle } from "./ThemeToggle";
 import { API_BASE_URL, request } from "../lib/api";
@@ -32,8 +32,15 @@ const nav = [
 export function Shell() {
   const { session, logout } = useAuth();
   const { t } = useI18n();
+  const { pathname } = useLocation();
   const queryClient = useQueryClient();
   const [loggingOut, setLoggingOut] = useState(false);
+  const workspaceClassName =
+    pathname === "/notifications"
+      ? "workspace workspace-messages"
+      : pathname === "/upload"
+        ? "workspace workspace-upload"
+        : "workspace";
 
   const handleLogout = useCallback(async () => {
     setLoggingOut(true);
@@ -98,7 +105,7 @@ export function Shell() {
           </button>
         </div>
       </aside>
-      <main className="workspace">
+      <main className={workspaceClassName}>
         <header className="topbar">
           <div>
             <span className="eyebrow">{t.shell.controlPlane}</span>

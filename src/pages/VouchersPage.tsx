@@ -1,11 +1,17 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Power, PowerOff, Search, TicketPlus } from "lucide-react";
-import { useState } from "react";
+import { Pencil, Power, PowerOff, Search, TicketPlus, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
-import { DataTable } from "../components/DataTable";
+import { ActionSheet } from "../components/ActionSheet";
+import {
+  DataTable,
+  type ColumnDef,
+  type SortChangeDirection,
+  type SortDirection,
+} from "../components/DataTable";
 import { ErrorState } from "../components/ErrorState";
 import { LoadingState } from "../components/LoadingState";
 import { NumberInput } from "../components/NumberInput";
@@ -103,6 +109,7 @@ type VoucherCopy = {
   created: string;
   updated: string;
   deactivated: string;
+  deleted: string;
   statusUpdated: string;
   listTitle: string;
   listEyebrow: string;
@@ -115,7 +122,7 @@ type VoucherCopy = {
   allStatuses: string;
   status: string;
   reset: string;
-  columns: string[];
+  columns: ColumnDef[];
   voucherLabel: string;
   typeLabels: Record<VoucherType, string>;
   to: string;
@@ -123,6 +130,10 @@ type VoucherCopy = {
   disable: string;
   enable: string;
   confirmDisable: (code: string) => string;
+  deletePermanent: string;
+  deletePermanentVoucher: (code: string) => string;
+  deletePermanentDisabled: string;
+  confirmDeletePermanent: (code: string) => string;
   formCreate: string;
   formEdit: string;
   formEyebrow: string;
@@ -143,6 +154,7 @@ type VoucherCopy = {
   exhausted: string;
   update: string;
   create: string;
+  createDialog: string;
   cancel: string;
   paginationLabel: string;
   rowsPerPage: string;
@@ -158,6 +170,7 @@ type VoucherStatusFilter =
   | "SCHEDULED"
   | "EXPIRED"
   | "EXHAUSTED";
+type VoucherListData = Paginated<Voucher> & { fetchedAt: number };
 
 const voucherStatusFilters: Exclude<VoucherStatusFilter, "">[] = [
   "ACTIVE",
@@ -166,12 +179,23 @@ const voucherStatusFilters: Exclude<VoucherStatusFilter, "">[] = [
   "EXPIRED",
   "EXHAUSTED",
 ];
+const voucherSortKeys = [
+  "createdAt",
+  "code",
+  "type",
+  "value",
+  "quota",
+  "minPurchase",
+  "expiresAt",
+] as const;
+type VoucherSortKey = (typeof voucherSortKeys)[number];
 
 const copy: Record<Language, VoucherCopy> = {
   en: {
     created: "Voucher created",
     updated: "Voucher updated",
     deactivated: "Voucher deactivated",
+    deleted: "Voucher permanently deleted",
     statusUpdated: "Voucher status updated",
     listTitle: "Vouchers",
     listEyebrow: "promo rules",
@@ -184,7 +208,16 @@ const copy: Record<Language, VoucherCopy> = {
     allStatuses: "All statuses",
     status: "Status",
     reset: "Reset",
-    columns: ["Code", "Type", "Value", "Quota", "Minimum", "Validity", "Status", "Action"],
+    columns: [
+      { label: "Code", key: "code", sortable: true, defaultSortDirection: "asc" },
+      { label: "Type", key: "type", sortable: true, defaultSortDirection: "asc" },
+      { label: "Value", key: "value", sortable: true },
+      { label: "Quota", key: "quota", sortable: true },
+      { label: "Minimum", key: "minimum", sortKey: "minPurchase", sortable: true },
+      { label: "Validity", key: "validity", sortKey: "expiresAt", sortable: true },
+      { label: "Status", key: "status" },
+      { label: "Action", key: "action" },
+    ],
     voucherLabel: "voucher",
     typeLabels: { FIXED: "Fixed", PERCENTAGE: "Percentage" },
     to: "to",
@@ -192,6 +225,11 @@ const copy: Record<Language, VoucherCopy> = {
     disable: "Disable",
     enable: "Enable",
     confirmDisable: (code: string) => `Disable voucher ${code}?`,
+    deletePermanent: "Delete permanently",
+    deletePermanentVoucher: (code: string) => `Delete voucher ${code} permanently`,
+    deletePermanentDisabled: "Used vouchers cannot be permanently deleted",
+    confirmDeletePermanent: (code: string) =>
+      `Permanently delete voucher "${code}"? Only unused vouchers can be deleted. This cannot be undone.`,
     formCreate: "Create voucher",
     formEdit: "Edit voucher",
     formEyebrow: "controlled discount",
@@ -212,7 +250,8 @@ const copy: Record<Language, VoucherCopy> = {
     exhausted: "Exhausted",
     update: "Update voucher",
     create: "Create voucher",
-    cancel: "Cancel edit",
+    createDialog: "Create",
+    cancel: "Cancel",
     paginationLabel: "Voucher table pagination",
     rowsPerPage: "Rows per page",
     previous: "Previous",
@@ -223,6 +262,7 @@ const copy: Record<Language, VoucherCopy> = {
     created: "Voucher dibuat",
     updated: "Voucher diperbarui",
     deactivated: "Voucher dinonaktifkan",
+    deleted: "Voucher dihapus permanen",
     statusUpdated: "Status voucher diperbarui",
     listTitle: "Voucher",
     listEyebrow: "aturan promo",
@@ -235,7 +275,16 @@ const copy: Record<Language, VoucherCopy> = {
     allStatuses: "Semua status",
     status: "Status",
     reset: "Reset",
-    columns: ["Kode", "Tipe", "Nilai", "Kuota", "Minimum", "Periode", "Status", "Aksi"],
+    columns: [
+      { label: "Kode", key: "code", sortable: true, defaultSortDirection: "asc" },
+      { label: "Tipe", key: "type", sortable: true, defaultSortDirection: "asc" },
+      { label: "Nilai", key: "value", sortable: true },
+      { label: "Kuota", key: "quota", sortable: true },
+      { label: "Minimum", key: "minimum", sortKey: "minPurchase", sortable: true },
+      { label: "Periode", key: "validity", sortKey: "expiresAt", sortable: true },
+      { label: "Status", key: "status" },
+      { label: "Aksi", key: "action" },
+    ],
     voucherLabel: "voucher",
     typeLabels: { FIXED: "Fixed", PERCENTAGE: "Percentage" },
     to: "sampai",
@@ -243,6 +292,11 @@ const copy: Record<Language, VoucherCopy> = {
     disable: "Nonaktifkan",
     enable: "Aktifkan",
     confirmDisable: (code: string) => `Nonaktifkan voucher ${code}?`,
+    deletePermanent: "Hapus permanen",
+    deletePermanentVoucher: (code: string) => `Hapus permanen voucher ${code}`,
+    deletePermanentDisabled: "Voucher yang sudah digunakan tidak bisa dihapus permanen",
+    confirmDeletePermanent: (code: string) =>
+      `Hapus permanen voucher "${code}"? Hanya voucher yang belum pernah digunakan yang dapat dihapus. Aksi ini tidak bisa dibatalkan.`,
     formCreate: "Buat voucher",
     formEdit: "Edit voucher",
     formEyebrow: "diskon terkontrol",
@@ -263,7 +317,8 @@ const copy: Record<Language, VoucherCopy> = {
     exhausted: "Exhausted",
     update: "Perbarui voucher",
     create: "Buat voucher",
-    cancel: "Batal edit",
+    createDialog: "Buat",
+    cancel: "Batal",
     paginationLabel: "Pagination tabel voucher",
     rowsPerPage: "Baris per halaman",
     previous: "Sebelumnya",
@@ -278,22 +333,51 @@ export function VouchersPage() {
   const c = copy[language];
   const queryClient = useQueryClient();
   const [editingVoucher, setEditingVoucher] = useState<Voucher | null>(null);
+  const [deletingVoucher, setDeletingVoucher] = useState<Voucher | null>(null);
+  const [voucherSheetOpen, setVoucherSheetOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"" | VoucherType>("");
   const [statusFilter, setStatusFilter] = useState<VoucherStatusFilter>("");
+  const [sortBy, setSortBy] = useState<VoucherSortKey | "">("");
+  const [sortDir, setSortDir] = useState<SortDirection>("desc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+  const effectiveSortBy = sortBy || "createdAt";
+  const effectiveSortDir = sortBy ? sortDir : "desc";
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 250);
+    return () => window.clearTimeout(handle);
+  }, [search]);
   const vouchersQuery = useQuery({
-    queryKey: ["vouchers", "admin", page, pageSize, search, typeFilter, statusFilter],
+    queryKey: [
+      "vouchers",
+      "admin",
+      page,
+      pageSize,
+      debouncedSearch,
+      typeFilter,
+      statusFilter,
+      effectiveSortBy,
+      effectiveSortDir,
+    ],
     queryFn: ({ signal }) => {
       // Prefer the admin endpoint (includes expired/inactive/exhausted rows).
       // Fall back to the public active list if the API has not shipped it yet.
-      const run = (path: string) =>
-        request<Paginated<Voucher>>(path, { token, signal });
+      const run = async (path: string): Promise<VoucherListData> => {
+        const data = await request<Paginated<Voucher>>(path, { token, signal });
+        if (!data) throw new Error("Unexpected empty voucher response");
+        return { ...data, fetchedAt: Date.now() };
+      };
       const params = new URLSearchParams({ limit: String(pageSize), page: String(page) });
-      if (search.trim()) params.set("search", search.trim());
+      if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim());
       if (typeFilter) params.set("type", typeFilter);
       if (statusFilter) params.set("status", statusFilter);
+      params.set("sortBy", effectiveSortBy);
+      params.set("sortDir", effectiveSortDir);
       const query = params.toString();
       return run(`/vouchers/admin/all?${query}`).catch((error: unknown) => {
         if (error instanceof ApiError && error.status === 404) {
@@ -302,7 +386,20 @@ export function VouchersPage() {
         throw error;
       });
     },
+    placeholderData: (previousData) => previousData,
   });
+  const setVoucherSort = (key: string, direction: SortChangeDirection) => {
+    if (!direction) {
+      setSortBy("");
+      setSortDir("desc");
+      setPage(1);
+      return;
+    }
+    if (!(voucherSortKeys as readonly string[]).includes(key)) return;
+    setSortBy(key as VoucherSortKey);
+    setSortDir(direction);
+    setPage(1);
+  };
   const form = useForm<VoucherFormInput, unknown, VoucherForm>({
     resolver: zodResolver(voucherSchema),
     defaultValues: emptyVoucherForm,
@@ -317,6 +414,7 @@ export function VouchersPage() {
         body: JSON.stringify(voucherPayload(values)),
       }),
     onSuccess: async () => {
+      setVoucherSheetOpen(false);
       setEditingVoucher(null);
       form.reset(emptyVoucherForm);
       await queryClient.invalidateQueries({ queryKey: ["vouchers"] });
@@ -332,6 +430,7 @@ export function VouchersPage() {
         body: JSON.stringify(voucherPayload(values)),
       }),
     onSuccess: async () => {
+      setVoucherSheetOpen(false);
       setEditingVoucher(null);
       form.reset(emptyVoucherForm);
       await queryClient.invalidateQueries({ queryKey: ["vouchers"] });
@@ -364,24 +463,44 @@ export function VouchersPage() {
     },
     onError: (error) => toast.error(readError(error, language)),
   });
+  const permanentDeleteVoucher = useMutation({
+    mutationFn: (id: string) =>
+      request(`/vouchers/${id}/permanent`, { token, method: "DELETE" }),
+    onSuccess: async (_data, id) => {
+      setDeletingVoucher(null);
+      if (editingVoucher?.id === id) {
+        setVoucherSheetOpen(false);
+        setEditingVoucher(null);
+        form.reset(emptyVoucherForm);
+      }
+      await queryClient.invalidateQueries({ queryKey: ["vouchers"] });
+      toast.success(c.deleted);
+    },
+    onError: (error) => toast.error(readError(error, language)),
+  });
 
   if (vouchersQuery.isLoading) return <LoadingState />;
   if (vouchersQuery.error)
     return <ErrorState message={readError(vouchersQuery.error, language)} />;
 
   const vouchers = vouchersQuery.data?.data ?? [];
-  const statusNow = vouchersQuery.dataUpdatedAt;
+  const statusNow = vouchersQuery.data?.fetchedAt ?? 0;
   const savingVoucher = createVoucher.isPending || updateVoucher.isPending;
+
+  const startCreatingVoucher = () => {
+    setEditingVoucher(null);
+    form.reset(emptyVoucherForm);
+    setVoucherSheetOpen(true);
+  };
 
   const startEditingVoucher = (voucher: Voucher) => {
     setEditingVoucher(voucher);
     form.reset(voucherToForm(voucher));
-    document
-      .getElementById("voucher-form")
-      ?.scrollIntoView({ block: "start", behavior: "smooth" });
+    setVoucherSheetOpen(true);
   };
 
   const cancelEditingVoucher = () => {
+    setVoucherSheetOpen(false);
     setEditingVoucher(null);
     form.reset(emptyVoucherForm);
   };
@@ -405,10 +524,7 @@ export function VouchersPage() {
                 type="search"
                 autoComplete="off"
                 value={search}
-                onChange={(event) => {
-                  setSearch(event.target.value);
-                  setPage(1);
-                }}
+                onChange={(event) => setSearch(event.target.value)}
                 placeholder={c.searchPlaceholder}
               />
             </span>
@@ -454,8 +570,11 @@ export function VouchersPage() {
             type="button"
             onClick={() => {
               setSearch("");
+              setDebouncedSearch("");
               setTypeFilter("");
               setStatusFilter("");
+              setSortBy("");
+              setSortDir("desc");
               setPage(1);
             }}
           >
@@ -465,50 +584,64 @@ export function VouchersPage() {
         <DataTable
           caption={c.tableCaption}
           columns={c.columns}
-          rows={vouchers.map((voucher) => [
-            voucher.code,
-            c.typeLabels[voucher.type],
-            voucher.type === "PERCENTAGE"
-              ? `${toNumber(voucher.value)}%`
-              : money(voucher.value),
-            `${voucher.usedCount}/${voucher.quota}`,
-            money(voucher.minPurchase),
-            `${shortDate(voucher.startsAt, language)} ${c.to} ${shortDate(voucher.expiresAt, language)}`,
-            <VoucherStatusBadge voucher={voucher} now={statusNow} copy={c} />,
-            <div className="table-actions">
-              <button
-                className="icon-button"
-                type="button"
-                aria-label={`${c.edit} ${c.voucherLabel} ${voucher.code}`}
-                title={c.edit}
-                onClick={() => startEditingVoucher(voucher)}
-              >
-                <Pencil size={16} aria-hidden="true" />
-              </button>
-              <button
-                className={`icon-button${voucher.isActive ? " icon-button-danger" : ""}`}
-                type="button"
-                aria-label={`${voucher.isActive ? c.disable : c.enable} ${c.voucherLabel} ${voucher.code}`}
-                title={voucher.isActive ? c.disable : c.enable}
-                disabled={deactivateVoucher.isPending || toggleVoucher.isPending}
-                onClick={() => {
-                  if (voucher.isActive) {
-                    if (window.confirm(c.confirmDisable(voucher.code))) {
-                      deactivateVoucher.mutate(voucher.id);
+          sort={{ key: sortBy, direction: sortDir, onSort: setVoucherSort }}
+          rows={vouchers.map((voucher) => {
+            const hardDeleteDisabled = voucher.usedCount > 0;
+            return [
+              voucher.code,
+              c.typeLabels[voucher.type],
+              voucher.type === "PERCENTAGE"
+                ? `${toNumber(voucher.value)}%`
+                : money(voucher.value),
+              `${voucher.usedCount}/${voucher.quota}`,
+              money(voucher.minPurchase),
+              `${shortDate(voucher.startsAt, language)} ${c.to} ${shortDate(voucher.expiresAt, language)}`,
+              <VoucherStatusBadge voucher={voucher} now={statusNow} copy={c} />,
+              <div className="table-actions">
+                <button
+                  className="icon-button"
+                  type="button"
+                  aria-label={`${c.edit} ${c.voucherLabel} ${voucher.code}`}
+                  title={c.edit}
+                  onClick={() => startEditingVoucher(voucher)}
+                >
+                  <Pencil size={16} aria-hidden="true" />
+                </button>
+                <button
+                  className={`icon-button${voucher.isActive ? " icon-button-destructive-glyph" : ""}`}
+                  type="button"
+                  aria-label={`${voucher.isActive ? c.disable : c.enable} ${c.voucherLabel} ${voucher.code}`}
+                  title={voucher.isActive ? c.disable : c.enable}
+                  disabled={deactivateVoucher.isPending || toggleVoucher.isPending}
+                  onClick={() => {
+                    if (voucher.isActive) {
+                      if (window.confirm(c.confirmDisable(voucher.code))) {
+                        deactivateVoucher.mutate(voucher.id);
+                      }
+                    } else {
+                      toggleVoucher.mutate({ id: voucher.id, isActive: true });
                     }
-                  } else {
-                    toggleVoucher.mutate({ id: voucher.id, isActive: true });
-                  }
-                }}
-              >
-                {voucher.isActive ? (
-                  <PowerOff size={16} aria-hidden="true" />
-                ) : (
-                  <Power size={16} aria-hidden="true" />
-                )}
-              </button>
-            </div>,
-          ])}
+                  }}
+                >
+                  {voucher.isActive ? (
+                    <PowerOff size={16} aria-hidden="true" />
+                  ) : (
+                    <Power size={16} aria-hidden="true" />
+                  )}
+                </button>
+                <button
+                  className="icon-button icon-button-danger"
+                  type="button"
+                  aria-label={c.deletePermanentVoucher(voucher.code)}
+                  title={hardDeleteDisabled ? c.deletePermanentDisabled : c.deletePermanent}
+                  disabled={hardDeleteDisabled || permanentDeleteVoucher.isPending}
+                  onClick={() => setDeletingVoucher(voucher)}
+                >
+                  <Trash2 size={16} aria-hidden="true" />
+                </button>
+              </div>,
+            ];
+          })}
         />
         <PaginationStrip
           meta={vouchersQuery.data?.meta}
@@ -527,13 +660,28 @@ export function VouchersPage() {
           }}
         />
       </Panel>
-      <Panel
+      <div className="panel-external-actions">
+        <button
+          className="primary-button"
+          type="button"
+          onClick={startCreatingVoucher}
+        >
+          <TicketPlus size={17} aria-hidden="true" />
+          {c.create}
+        </button>
+      </div>
+      <ActionSheet
+        open={voucherSheetOpen}
         title={editingVoucher ? c.formEdit : c.formCreate}
         eyebrow={editingVoucher ? editingVoucher.code : c.formEyebrow}
+        closeLabel={c.cancel}
+        onClose={() => {
+          if (!savingVoucher) cancelEditingVoucher();
+        }}
       >
         <form
           id="voucher-form"
-          className="control-form"
+          className="control-form action-sheet-form"
           onSubmit={form.handleSubmit((values) =>
             editingVoucher
               ? updateVoucher.mutate({ id: editingVoucher.id, values })
@@ -720,26 +868,64 @@ export function VouchersPage() {
           </label>
           <div className="form-actions">
             <button
+              className="ghost-button"
+              type="button"
+              disabled={savingVoucher}
+              onClick={cancelEditingVoucher}
+            >
+              {c.cancel}
+            </button>
+            <button
               className="primary-button"
               type="submit"
               disabled={savingVoucher}
             >
               <TicketPlus size={17} />
-              {editingVoucher ? c.update : c.create}
+              {editingVoucher ? c.update : c.createDialog}
             </button>
-            {editingVoucher && (
-              <button
-                className="ghost-button"
-                type="button"
-                disabled={savingVoucher}
-                onClick={cancelEditingVoucher}
-              >
-                {c.cancel}
-              </button>
-            )}
           </div>
         </form>
-      </Panel>
+      </ActionSheet>
+      <ActionSheet
+        open={Boolean(deletingVoucher)}
+        title={c.deletePermanent}
+        eyebrow={deletingVoucher?.code}
+        closeLabel={c.cancel}
+        onClose={() => {
+          if (!permanentDeleteVoucher.isPending) setDeletingVoucher(null);
+        }}
+      >
+        <div className="control-form action-sheet-form">
+          <p className="copy-block">
+            {deletingVoucher ? c.confirmDeletePermanent(deletingVoucher.code) : ""}
+          </p>
+          <div className="form-actions">
+            <button
+              className="ghost-button"
+              type="button"
+              disabled={permanentDeleteVoucher.isPending}
+              onClick={() => setDeletingVoucher(null)}
+            >
+              {c.cancel}
+            </button>
+            <button
+              className="danger-button"
+              type="button"
+              disabled={
+                !deletingVoucher ||
+                deletingVoucher.usedCount > 0 ||
+                permanentDeleteVoucher.isPending
+              }
+              onClick={() => {
+                if (deletingVoucher) permanentDeleteVoucher.mutate(deletingVoucher.id);
+              }}
+            >
+              <Trash2 size={17} aria-hidden="true" />
+              {c.deletePermanent}
+            </button>
+          </div>
+        </div>
+      </ActionSheet>
     </div>
   );
 }

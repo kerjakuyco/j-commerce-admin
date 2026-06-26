@@ -11,4 +11,15 @@ describe("admin i18n", () => {
     expect(getTranslations("en").shell.operationsConsole).toBe("Operations console");
     expect(getTranslations("id").shell.operationsConsole).toBe("Operations console");
   });
+
+  it("localizes dashboard order status labels in Indonesian", () => {
+    expect(getTranslations("en").dashboard.statusLabels.PENDING).toBe("Pending");
+    expect(getTranslations("en").dashboard.statusLabels.PAID).toBe("Paid");
+    expect(getTranslations("id").dashboard.statusLabels.PENDING).toBe("Menunggu");
+    expect(getTranslations("id").dashboard.statusLabels.PAID).toBe("Dibayar");
+    expect(getTranslations("id").dashboard.statusLabels.PACKED).toBe("Dikemas");
+    expect(getTranslations("id").dashboard.statusLabels.SHIPPED).toBe("Dikirim");
+    expect(getTranslations("id").dashboard.statusLabels.DELIVERED).toBe("Selesai");
+    expect(getTranslations("id").dashboard.statusLabels.CANCELLED).toBe("Dibatalkan");
+  });
 });

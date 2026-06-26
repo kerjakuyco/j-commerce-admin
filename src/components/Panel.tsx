@@ -1,4 +1,5 @@
 import clsx from 'clsx'
+import type { ReactNode } from "react";
 
 export function Panel({
   title,
@@ -9,8 +10,8 @@ export function Panel({
 }: {
   title: string;
   eyebrow?: string;
-  headerMeta?: React.ReactNode;
-  children: React.ReactNode;
+  headerMeta?: ReactNode;
+  children: ReactNode;
   className?: string;
 }) {
   return (
@@ -20,7 +21,11 @@ export function Panel({
           {eyebrow && <span className="eyebrow">{eyebrow}</span>}
           <h2>{title}</h2>
         </div>
-        {headerMeta && <span className="panel-header-meta">{headerMeta}</span>}
+        {headerMeta && (
+          <div className="panel-header-aside">
+            <span className="panel-header-meta">{headerMeta}</span>
+          </div>
+        )}
       </div>
       {children}
     </section>
@@ -33,7 +38,7 @@ export function StatCard({
   detail,
 }: {
   label: string;
-  value: React.ReactNode;
+  value: ReactNode;
   detail?: string;
 }) {
   return (

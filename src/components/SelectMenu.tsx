@@ -36,6 +36,9 @@ export function SelectMenu({
   optionClassName = "",
   triggerLabel,
   renderOption,
+  searchable = false,
+  searchPlaceholder = "Search options",
+  noResultsLabel = "No options found",
 }: {
   id?: string;
   value: string;
@@ -49,18 +52,28 @@ export function SelectMenu({
   optionClassName?: string;
   triggerLabel?: ReactNode;
   renderOption?: (option: SelectMenuOption) => ReactNode;
+  searchable?: boolean;
+  searchPlaceholder?: string;
+  noResultsLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
   const [placement, setPlacement] = useState<MenuPlacement>("bottom");
   const [alignment, setAlignment] = useState<MenuAlignment>("start");
   const [maxHeight, setMaxHeight] = useState(defaultMenuMaxHeight);
   const generatedId = useId();
   const menuId = useId();
+  const searchId = useId();
   const wrapperRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const selected = options.find((option) => option.value === value);
   const buttonId = id ?? generatedId;
   const shownValue = triggerLabel ?? selected?.label ?? placeholder;
+  const normalizedSearch = search.trim().toLowerCase();
+  const visibleOptions = normalizedSearch
+    ? options.filter((option) => option.label.toLowerCase().includes(normalizedSearch))
+    : options;
 
   const updatePlacement = useCallback(() => {
     const wrapper = wrapperRef.current;
@@ -93,7 +106,12 @@ export function SelectMenu({
 
   useLayoutEffect(() => {
     if (open) updatePlacement();
-  }, [open, options.length, updatePlacement]);
+  }, [open, visibleOptions.length, updatePlacement]);
+
+  useEffect(() => {
+    if (!open || !searchable) return;
+    if (searchable) window.setTimeout(() => searchRef.current?.focus(), 0);
+  }, [open, searchable]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -107,6 +125,11 @@ export function SelectMenu({
     };
   }, [open, updatePlacement]);
 
+  const closeMenu = () => {
+    setSearch("");
+    setOpen(false);
+  };
+
   return (
     <div
       className={clsx("select-menu", className)}
@@ -116,7 +139,7 @@ export function SelectMenu({
         if (nextFocus instanceof Node && event.currentTarget.contains(nextFocus)) {
           return;
         }
-        setOpen(false);
+        closeMenu();
       }}
     >
       <button
@@ -128,9 +151,12 @@ export function SelectMenu({
         aria-expanded={open}
         aria-controls={menuId}
         disabled={disabled}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          if (open) closeMenu();
+          else setOpen(true);
+        }}
         onKeyDown={(event) => {
-          if (event.key === "Escape") setOpen(false);
+          if (event.key === "Escape") closeMenu();
           if (event.key === "ArrowDown") setOpen(true);
         }}
       >
@@ -143,11 +169,31 @@ export function SelectMenu({
           ref={listRef}
           role="listbox"
           aria-labelledby={buttonId}
+          data-searchable={searchable || undefined}
           data-placement={placement}
           data-align={alignment}
           style={{ maxHeight }}
         >
-          {options.map((option) => (
+          {searchable && (
+            <label className="select-menu-search" htmlFor={searchId}>
+              <input
+                id={searchId}
+                ref={searchRef}
+                type="search"
+                autoComplete="off"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") closeMenu();
+                }}
+                placeholder={searchPlaceholder}
+              />
+            </label>
+          )}
+          {visibleOptions.length === 0 ? (
+            <span className="select-menu-empty">{noResultsLabel}</span>
+          ) : null}
+          {visibleOptions.map((option) => (
             <button
               className={clsx(
                 "select-menu-option",
@@ -162,7 +208,7 @@ export function SelectMenu({
               onClick={() => {
                 if (option.disabled) return;
                 onChange(option.value);
-                setOpen(false);
+                closeMenu();
               }}
             >
               {renderOption ? renderOption(option) : option.label}

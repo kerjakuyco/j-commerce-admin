@@ -103,9 +103,9 @@ export function NotificationsPage() {
 
   return (
     <div className="split-layout">
-      <Panel title={c.title} eyebrow={c.eyebrow}>
+      <Panel title={c.title} eyebrow={c.eyebrow} className="broadcast-panel">
         <form
-          className="control-form"
+          className="control-form broadcast-form"
           onSubmit={form.handleSubmit((values) => {
             if (window.confirm(c.confirm)) {
               mutation.mutate(values);
@@ -148,7 +148,7 @@ export function NotificationsPage() {
               </span>
             )}
           </label>
-          <label htmlFor="notification-body">
+          <label className="broadcast-message-field" htmlFor="notification-body">
             {c.message}
             <textarea
               id="notification-body"
@@ -161,7 +161,7 @@ export function NotificationsPage() {
               </span>
             )}
           </label>
-          <div className="form-actions">
+          <div className="form-actions broadcast-form-actions">
             <button
               className="primary-button"
               type="submit"

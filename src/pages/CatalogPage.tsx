@@ -16,8 +16,14 @@ import { Controller, useForm, useWatch } from "react-hook-form";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { z } from "zod";
+import { ActionSheet } from "../components/ActionSheet";
 import { Badge } from "../components/Badge";
-import { DataTable } from "../components/DataTable";
+import {
+  DataTable,
+  type ColumnDef,
+  type SortChangeDirection,
+  type SortDirection,
+} from "../components/DataTable";
 import { ErrorState } from "../components/ErrorState";
 import { ImageUploadButton } from "../components/ImageUploadButton";
 import { LoadingState } from "../components/LoadingState";
@@ -36,6 +42,7 @@ import {
   readFormError,
   slugify,
 } from "../lib/format";
+import { useDebouncedSearchParam } from "../lib/useDebouncedSearchParam";
 import type {
   Category,
   Paginated,
@@ -141,10 +148,31 @@ const emptyProductForm: ProductFormInput = {
   isFlashSale: false,
   flashSaleEndsAt: "",
 };
+const emptyVariantForm: VariantFormInput = {
+  productId: "",
+  name: "",
+  sku: "",
+  price: 0,
+  stock: 0,
+};
+const emptyCategoryForm: CategoryFormInput = {
+  name: "",
+  slug: "",
+  icon: "",
+  sortOrder: 0,
+};
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 const DEFAULT_PAGE_SIZE = 25;
-const catalogSorts = ["newest", "price_asc", "price_desc", "rating", "sold"] as const;
-type CatalogSort = (typeof catalogSorts)[number];
+const catalogSortKeys = ["createdAt", "name", "brand", "category", "basePrice", "rating"] as const;
+type CatalogSortKey = (typeof catalogSortKeys)[number];
+
+function isCatalogSortKey(value: string): value is CatalogSortKey {
+  return (catalogSortKeys as readonly string[]).includes(value);
+}
+
+function isSortDirection(value: string): value is SortDirection {
+  return value === "asc" || value === "desc";
+}
 
 const copy = {
   en: {
@@ -170,6 +198,7 @@ const copy = {
     filtersLabel: "Catalog filters",
     search: "Search",
     searchPlaceholder: "Name, brand, description",
+    noOptions: "No options found",
     category: "Category",
     allCategories: "All categories",
     sort: "Sort",
@@ -181,16 +210,16 @@ const copy = {
     pageOf: (page: number, totalPages: number) => `Page ${page} of ${totalPages}`,
     tableCaption: "Product catalog table",
     tableColumns: [
-      "Product",
-      "Brand",
-      "Category",
-      "Price",
-      "Rating",
-      "Variants",
-      "Stock",
-      "Merchandising",
-      "Action",
-    ],
+      { label: "Product", key: "product", sortKey: "name", sortable: true, defaultSortDirection: "asc" },
+      { label: "Brand", key: "brand", sortable: true, defaultSortDirection: "asc" },
+      { label: "Category", key: "category", sortable: true, defaultSortDirection: "asc" },
+      { label: "Price", key: "price", sortKey: "basePrice", sortable: true, defaultSortDirection: "asc" },
+      { label: "Rating", key: "rating", sortable: true },
+      { label: "Variants", key: "variants" },
+      { label: "Stock", key: "stock" },
+      { label: "Merchandising", key: "merchandising" },
+      { label: "Action", key: "action" },
+    ] satisfies ColumnDef[],
     editProduct: (name: string) => `Edit ${name}`,
     deleteProduct: (name: string) => `Delete ${name}`,
     edit: "Edit",
@@ -221,8 +250,9 @@ const copy = {
     description: "Description",
     update: "Update",
     create: "Create",
-    cancelEdit: "Cancel edit",
-    variantAndImage: "Variant and image",
+    cancelEdit: "Cancel",
+    manageVariants: "Manage variants",
+    manageImages: "Manage images",
     inventory: "inventory",
     product: "Product",
     selectProduct: "Select product",
@@ -232,6 +262,7 @@ const copy = {
     stock: "Stock",
     addVariant: "Add variant",
     createCategory: "Create category",
+    createCategoryDialog: "Create",
     organization: "organisasi",
     categoryName: "Category name",
     icon: "Icon",
@@ -270,7 +301,6 @@ const copy = {
     previewHint: "Preview appears after a valid asset URL.",
     noEndDate: "no end date",
     invalidDate: "invalid date",
-    imageTarget: "Image target",
     attachedImagePreview: "Attached image preview",
     attachImage: "Attach image",
   },
@@ -297,6 +327,7 @@ const copy = {
     filtersLabel: "Filter katalog",
     search: "Cari",
     searchPlaceholder: "Nama, brand, deskripsi",
+    noOptions: "Tidak ada opsi",
     category: "Kategori",
     allCategories: "Semua kategori",
     sort: "Urutkan",
@@ -308,16 +339,16 @@ const copy = {
     pageOf: (page: number, totalPages: number) => `Halaman ${page} dari ${totalPages}`,
     tableCaption: "Tabel katalog produk",
     tableColumns: [
-      "Produk",
-      "Brand",
-      "Kategori",
-      "Harga",
-      "Rating",
-      "Varian",
-      "Stok",
-      "Merchandising",
-      "Aksi",
-    ],
+      { label: "Produk", key: "product", sortKey: "name", sortable: true, defaultSortDirection: "asc" },
+      { label: "Brand", key: "brand", sortable: true, defaultSortDirection: "asc" },
+      { label: "Kategori", key: "category", sortable: true, defaultSortDirection: "asc" },
+      { label: "Harga", key: "price", sortKey: "basePrice", sortable: true, defaultSortDirection: "asc" },
+      { label: "Rating", key: "rating", sortable: true },
+      { label: "Varian", key: "variants" },
+      { label: "Stok", key: "stock" },
+      { label: "Merchandising", key: "merchandising" },
+      { label: "Aksi", key: "action" },
+    ] satisfies ColumnDef[],
     editProduct: (name: string) => `Edit ${name}`,
     deleteProduct: (name: string) => `Hapus ${name}`,
     edit: "Edit",
@@ -348,8 +379,9 @@ const copy = {
     description: "Deskripsi",
     update: "Perbarui",
     create: "Buat",
-    cancelEdit: "Batal edit",
-    variantAndImage: "Varian dan gambar",
+    cancelEdit: "Batal",
+    manageVariants: "Kelola varian",
+    manageImages: "Kelola gambar",
     inventory: "inventory",
     product: "Produk",
     selectProduct: "Pilih produk",
@@ -359,6 +391,7 @@ const copy = {
     stock: "Stok",
     addVariant: "Tambah varian",
     createCategory: "Buat kategori",
+    createCategoryDialog: "Buat",
     organization: "organization",
     categoryName: "Nama kategori",
     icon: "Ikon",
@@ -397,7 +430,6 @@ const copy = {
     previewHint: "Preview muncul setelah URL aset valid.",
     noEndDate: "tanpa tanggal berakhir",
     invalidDate: "tanggal tidak valid",
-    imageTarget: "Target gambar",
     attachedImagePreview: "Preview gambar terpasang",
     attachImage: "Pasang gambar",
   },
@@ -413,16 +445,30 @@ export function CatalogPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const searchFromUrl = searchParams.get("search") ?? "";
   const categoryFromUrl = searchParams.get("categoryId") ?? "";
+  const sortByParam = searchParams.get("sortBy") ?? "";
+  const sortDirParam = searchParams.get("sortDir") ?? "";
   const pageParam = Number(searchParams.get("page") ?? "1");
   const pageSizeParam = Number(searchParams.get("limit") ?? String(DEFAULT_PAGE_SIZE));
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [productSheetOpen, setProductSheetOpen] = useState(false);
+  const [variantSheetOpen, setVariantSheetOpen] = useState(false);
+  const [imageSheetOpen, setImageSheetOpen] = useState(false);
+  const [categorySheetOpen, setCategorySheetOpen] = useState(false);
   const catalogSearch = searchFromUrl;
+  const [catalogSearchDraft, setCatalogSearchDraft] = useDebouncedSearchParam({
+    value: catalogSearch,
+    searchParams,
+    setSearchParams,
+  });
   const catalogCategoryId = categoryFromUrl;
   const page = Number.isInteger(pageParam) && pageParam > 0 ? pageParam : 1;
   const pageSize = PAGE_SIZE_OPTIONS.includes(pageSizeParam)
     ? pageSizeParam
     : DEFAULT_PAGE_SIZE;
-  const [catalogSort, setCatalogSort] = useState<CatalogSort>("newest");
+  const visibleSortBy = isCatalogSortKey(sortByParam) ? sortByParam : "";
+  const visibleSortDir = isSortDirection(sortDirParam) ? sortDirParam : "desc";
+  const sortBy = visibleSortBy || "createdAt";
+  const sortDir = visibleSortBy ? visibleSortDir : "desc";
   const setCatalogParam = (key: string, value: string) => {
     const next = new URLSearchParams(searchParams);
     if (value) next.set(key, value);
@@ -433,18 +479,41 @@ export function CatalogPage() {
   const productQuery = new URLSearchParams({
     limit: String(pageSize),
     page: String(page),
-    sort: catalogSort,
+    sortBy,
+    sortDir,
   });
   if (catalogSearch.trim()) productQuery.set("search", catalogSearch.trim());
   if (catalogCategoryId) productQuery.set("categoryId", catalogCategoryId);
   const productsQuery = useQuery({
-    queryKey: ["products", catalogSearch.trim(), catalogCategoryId, catalogSort, page, pageSize],
+    queryKey: [
+      "products",
+      catalogSearch.trim(),
+      catalogCategoryId,
+      sortBy,
+      sortDir,
+      page,
+      pageSize,
+    ],
     queryFn: ({ signal }) =>
       request<Paginated<Product>>(`/products?${productQuery.toString()}`, {
         token,
         signal,
       }),
+    placeholderData: (previousData) => previousData,
   });
+
+  const setCatalogSort = (key: string, direction: SortChangeDirection) => {
+    const next = new URLSearchParams(searchParams);
+    if (direction) {
+      next.set("sortBy", key);
+      next.set("sortDir", direction);
+    } else {
+      next.delete("sortBy");
+      next.delete("sortDir");
+    }
+    next.set("page", "1");
+    setSearchParams(next);
+  };
   const categoriesQuery = useQuery({
     queryKey: ["categories"],
     queryFn: ({ signal }) =>
@@ -468,11 +537,11 @@ export function CatalogPage() {
   });
   const variantForm = useForm<VariantFormInput, unknown, VariantForm>({
     resolver: zodResolver(variantSchema),
-    defaultValues: { productId: "", name: "", sku: "", price: 0, stock: 0 },
+    defaultValues: emptyVariantForm,
   });
   const categoryForm = useForm<CategoryFormInput, unknown, CategoryForm>({
     resolver: zodResolver(categorySchema),
-    defaultValues: { name: "", slug: "", icon: "", sortOrder: 0 },
+    defaultValues: emptyCategoryForm,
   });
 
   const invalidateCatalog = async (productId?: string) => {
@@ -509,6 +578,7 @@ export function CatalogPage() {
         }),
     }),
     onSuccess: async () => {
+      setProductSheetOpen(false);
       setEditingProduct(null);
       productForm.reset(emptyProductForm);
       await invalidateCatalog();
@@ -550,6 +620,7 @@ export function CatalogPage() {
       return updated;
     },
     onSuccess: async (_product, variables) => {
+      setProductSheetOpen(false);
       setEditingProduct(null);
       productForm.reset(emptyProductForm);
       await invalidateCatalog(variables.id);
@@ -593,7 +664,7 @@ export function CatalogPage() {
         }),
       }),
     onSuccess: async () => {
-      variantForm.reset();
+      variantForm.reset(emptyVariantForm);
       await invalidateCatalog();
       toast.success(c.variantAdded);
     },
@@ -609,9 +680,10 @@ export function CatalogPage() {
           ...values,
           slug: values.slug || slugify(values.name),
         }),
-      }),
+    }),
     onSuccess: async () => {
-      categoryForm.reset({ name: "", slug: "", icon: "", sortOrder: 0 });
+      setCategorySheetOpen(false);
+      categoryForm.reset(emptyCategoryForm);
       await invalidateCatalog();
       toast.success(c.categoryCreated);
     },
@@ -626,7 +698,12 @@ export function CatalogPage() {
         token,
         method: "DELETE",
       }),
-    onSuccess: async () => {
+    onSuccess: async (_result, id) => {
+      if (editingProduct?.id === id) {
+        setProductSheetOpen(false);
+        setEditingProduct(null);
+        productForm.reset(emptyProductForm);
+      }
       await invalidateCatalog();
       toast.success(c.productRemoved);
     },
@@ -691,17 +768,36 @@ export function CatalogPage() {
   const categories = categoriesQuery.data ?? [];
   const imageProduct = productDetailQuery.data ?? editingProduct;
   const savingProduct = createProduct.isPending || updateProduct.isPending;
+  const startCreatingProduct = () => {
+    setEditingProduct(null);
+    productForm.reset(emptyProductForm);
+    setProductSheetOpen(true);
+  };
+
   const startEditingProduct = (product: Product) => {
     setEditingProduct(product);
     productForm.reset(productToForm(product));
-    document
-      .getElementById("catalog-product-form")
-      ?.scrollIntoView({ block: "start", behavior: "smooth" });
+    setProductSheetOpen(true);
   };
 
   const cancelEditingProduct = () => {
+    setProductSheetOpen(false);
     setEditingProduct(null);
     productForm.reset(emptyProductForm);
+  };
+
+  const closeVariantSheet = () => {
+    setVariantSheetOpen(false);
+    variantForm.reset(emptyVariantForm);
+  };
+
+  const closeImageSheet = () => {
+    setImageSheetOpen(false);
+  };
+
+  const closeCategorySheet = () => {
+    setCategorySheetOpen(false);
+    categoryForm.reset(emptyCategoryForm);
   };
 
   return (
@@ -719,8 +815,8 @@ export function CatalogPage() {
               <Search size={16} aria-hidden="true" />
               <input
                 id="catalog-search"
-                value={catalogSearch}
-                onChange={(event) => setCatalogParam("search", event.target.value)}
+                value={catalogSearchDraft}
+                onChange={(event) => setCatalogSearchDraft(event.target.value)}
                 placeholder={c.searchPlaceholder}
                 type="search"
               />
@@ -731,6 +827,9 @@ export function CatalogPage() {
             <SelectMenu
               id="catalog-category-filter"
               value={catalogCategoryId}
+              searchable
+              searchPlaceholder={c.search}
+              noResultsLabel={c.noOptions}
               options={[
                 { value: "", label: c.allCategories },
                 ...categories.map((category) => ({
@@ -741,29 +840,11 @@ export function CatalogPage() {
               onChange={(value) => setCatalogParam("categoryId", value)}
             />
           </label>
-          <label htmlFor="catalog-sort">
-            {c.sort}
-            <SelectMenu
-              id="catalog-sort"
-              value={catalogSort}
-              options={catalogSorts.map((sort) => ({
-                value: sort,
-                label: c.sortLabels[sort],
-              }))}
-              onChange={(value) => {
-                setCatalogSort(value as CatalogSort);
-                const next = new URLSearchParams(searchParams);
-                next.set("page", "1");
-                setSearchParams(next);
-              }}
-            />
-          </label>
           <button
             className="ghost-button"
             type="button"
             onClick={() => {
               setSearchParams(new URLSearchParams());
-              setCatalogSort("newest");
             }}
           >
             {c.reset}
@@ -772,6 +853,7 @@ export function CatalogPage() {
         <DataTable
           caption={c.tableCaption}
           columns={[...c.tableColumns]}
+          sort={{ key: visibleSortBy, direction: visibleSortDir, onSort: setCatalogSort }}
           keyExtractor={(_row, index) => products[index]?.id ?? index}
           rows={products.map((product) => [
             product.name,
@@ -839,14 +921,52 @@ export function CatalogPage() {
           }}
         />
       </Panel>
-      <Panel
+      <div className="panel-external-actions">
+        <button
+          className="ghost-button"
+          type="button"
+          onClick={() => setVariantSheetOpen(true)}
+        >
+          <Tags size={17} aria-hidden="true" />
+          {c.manageVariants}
+        </button>
+        <button
+          className="ghost-button"
+          type="button"
+          onClick={() => setImageSheetOpen(true)}
+        >
+          <ImagePlus size={17} aria-hidden="true" />
+          {c.manageImages}
+        </button>
+        <button
+          className="ghost-button"
+          type="button"
+          onClick={() => setCategorySheetOpen(true)}
+        >
+          <Tags size={17} aria-hidden="true" />
+          {c.createCategory}
+        </button>
+        <button
+          className="primary-button"
+          type="button"
+          onClick={startCreatingProduct}
+        >
+          <PackagePlus size={17} aria-hidden="true" />
+          {c.createProduct}
+        </button>
+      </div>
+      <ActionSheet
+        open={productSheetOpen}
         title={editingProduct ? c.editProduct(editingProduct.name) : c.createProduct}
         eyebrow={editingProduct ? editingProduct.name : c.productDetails}
-        className="catalog-product-panel"
+        closeLabel={c.cancelEdit}
+        onClose={() => {
+          if (!savingProduct) cancelEditingProduct();
+        }}
       >
         <form
           id="catalog-product-form"
-          className="control-form product-form-grid"
+          className="control-form product-form-grid action-sheet-form"
           onSubmit={productForm.handleSubmit((values) =>
             editingProduct
               ? updateProduct.mutate({ id: editingProduct.id, values })
@@ -901,6 +1021,9 @@ export function CatalogPage() {
                 <SelectMenu
                   id="product-category"
                   value={field.value ?? ""}
+                  searchable
+                  searchPlaceholder={c.search}
+                  noResultsLabel={c.noOptions}
                   options={[
                     { value: "", label: c.selectCategory },
                     ...categories.map((category) => ({
@@ -1051,22 +1174,20 @@ export function CatalogPage() {
           </label>
           <div className="form-actions form-submit">
             <button
+              className="ghost-button"
+              type="button"
+              disabled={savingProduct}
+              onClick={cancelEditingProduct}
+            >
+              {c.cancelEdit}
+            </button>
+            <button
               className="primary-button"
               type="submit"
               disabled={savingProduct}
             >
               <PackagePlus size={17} /> {editingProduct ? c.update : c.create}
             </button>
-            {editingProduct && (
-              <button
-                className="ghost-button"
-                type="button"
-                disabled={savingProduct}
-                onClick={cancelEditingProduct}
-              >
-                {c.cancelEdit}
-              </button>
-            )}
           </div>
         </form>
         {editingProduct && (
@@ -1084,113 +1205,134 @@ export function CatalogPage() {
             }
           />
         )}
-      </Panel>
-      <div className="catalog-side-stack">
-        <Panel title={c.variantAndImage} eyebrow={c.inventory}>
-          <form
-            className="control-form"
-            onSubmit={variantForm.handleSubmit((values) =>
-              createVariant.mutate(values),
+      </ActionSheet>
+      <ActionSheet
+        open={variantSheetOpen}
+        title={c.manageVariants}
+        eyebrow={c.inventory}
+        closeLabel={c.cancelEdit}
+        onClose={() => {
+          if (!createVariant.isPending) {
+            closeVariantSheet();
+          }
+        }}
+      >
+        <form
+          className="control-form action-sheet-form"
+          onSubmit={variantForm.handleSubmit((values) =>
+            createVariant.mutate(values),
+          )}
+        >
+          <label htmlFor="variant-productId">
+            {c.product}
+            <Controller
+              control={variantForm.control}
+              name="productId"
+              render={({ field }) => (
+                <SelectMenu
+                  id="variant-productId"
+                  value={field.value ?? ""}
+                  searchable
+                  searchPlaceholder={c.search}
+                  noResultsLabel={c.noOptions}
+                  options={[
+                    { value: "", label: c.selectProduct },
+                    ...products.map((product) => ({
+                      value: product.id,
+                      label: product.name,
+                    })),
+                  ]}
+                  onChange={field.onChange}
+                />
+              )}
+            />
+            {variantForm.formState.errors.productId && (
+              <span className="field-error">
+                {readFormError(variantForm.formState.errors.productId.message, language)}
+              </span>
             )}
-          >
-            <label htmlFor="variant-productId">
-              {c.product}
-              <Controller
-                control={variantForm.control}
-                name="productId"
-                render={({ field }) => (
-                  <SelectMenu
-                    id="variant-productId"
-                    value={field.value ?? ""}
-                    options={[
-                      { value: "", label: c.selectProduct },
-                      ...products.map((product) => ({
-                        value: product.id,
-                        label: product.name,
-                      })),
-                    ]}
-                    onChange={field.onChange}
-                  />
-                )}
-              />
-              {variantForm.formState.errors.productId && (
-                <span className="field-error">
-                  {readFormError(variantForm.formState.errors.productId.message, language)}
-                </span>
+          </label>
+          <label htmlFor="variant-name">
+            {c.variantName}
+            <input
+              id="variant-name"
+              {...variantForm.register("name")}
+              placeholder={c.variantName}
+            />
+            {variantForm.formState.errors.name && (
+              <span className="field-error">
+                {readFormError(variantForm.formState.errors.name.message, language)}
+              </span>
+            )}
+          </label>
+          <label htmlFor="variant-sku">
+            {c.sku}
+            <input
+              id="variant-sku"
+              {...variantForm.register("sku")}
+              placeholder={c.sku}
+            />
+            {variantForm.formState.errors.sku && (
+              <span className="field-error">
+                {readFormError(variantForm.formState.errors.sku.message, language)}
+              </span>
+            )}
+          </label>
+          <label htmlFor="variant-price">
+            {c.price}
+            <Controller
+              control={variantForm.control}
+              name="price"
+              render={({ field }) => (
+                <NumberInput
+                  id="variant-price"
+                  name={field.name}
+                  ref={field.ref}
+                  value={field.value}
+                  onBlur={field.onBlur}
+                  onValueChange={field.onChange}
+                  placeholder={c.price}
+                />
               )}
-            </label>
-            <label htmlFor="variant-name">
-              {c.variantName}
-              <input
-                id="variant-name"
-                {...variantForm.register("name")}
-                placeholder={c.variantName}
-              />
-              {variantForm.formState.errors.name && (
-                <span className="field-error">
-                  {readFormError(variantForm.formState.errors.name.message, language)}
-                </span>
+            />
+            {variantForm.formState.errors.price && (
+              <span className="field-error">
+                {readFormError(variantForm.formState.errors.price.message, language)}
+              </span>
+            )}
+          </label>
+          <label htmlFor="variant-stock">
+            {c.stock}
+            <Controller
+              control={variantForm.control}
+              name="stock"
+              render={({ field }) => (
+                <NumberInput
+                  id="variant-stock"
+                  name={field.name}
+                  ref={field.ref}
+                  value={field.value}
+                  onBlur={field.onBlur}
+                  onValueChange={field.onChange}
+                  placeholder={c.stock}
+                />
               )}
-            </label>
-            <label htmlFor="variant-sku">
-              {c.sku}
-              <input
-                id="variant-sku"
-                {...variantForm.register("sku")}
-                placeholder={c.sku}
-              />
-              {variantForm.formState.errors.sku && (
-                <span className="field-error">
-                  {readFormError(variantForm.formState.errors.sku.message, language)}
-                </span>
-              )}
-            </label>
-            <label htmlFor="variant-price">
-              {c.price}
-              <Controller
-                control={variantForm.control}
-                name="price"
-                render={({ field }) => (
-                  <NumberInput
-                    id="variant-price"
-                    name={field.name}
-                    ref={field.ref}
-                    value={field.value}
-                    onBlur={field.onBlur}
-                    onValueChange={field.onChange}
-                    placeholder={c.price}
-                  />
-                )}
-              />
-              {variantForm.formState.errors.price && (
-                <span className="field-error">
-                  {readFormError(variantForm.formState.errors.price.message, language)}
-                </span>
-              )}
-            </label>
-            <label htmlFor="variant-stock">
-              {c.stock}
-              <Controller
-                control={variantForm.control}
-                name="stock"
-                render={({ field }) => (
-                  <NumberInput
-                    id="variant-stock"
-                    name={field.name}
-                    ref={field.ref}
-                    value={field.value}
-                    onBlur={field.onBlur}
-                    onValueChange={field.onChange}
-                    placeholder={c.stock}
-                  />
-                )}
-              />
-              {variantForm.formState.errors.stock && (
-                <span className="field-error">
-                  {readFormError(variantForm.formState.errors.stock.message, language)}
-                </span>
-              )}
-            </label>
+            />
+            {variantForm.formState.errors.stock && (
+              <span className="field-error">
+                {readFormError(variantForm.formState.errors.stock.message, language)}
+              </span>
+            )}
+          </label>
+          <div className="form-actions">
+            <button
+              className="ghost-button"
+              type="button"
+              disabled={createVariant.isPending}
+              onClick={closeVariantSheet}
+            >
+              {c.cancelEdit}
+            </button>
             <button
               className="primary-button"
               type="submit"
@@ -1198,94 +1340,123 @@ export function CatalogPage() {
             >
               <Tags size={17} /> {c.addVariant}
             </button>
-          </form>
-          <ImageAttachForm
-            products={products}
-            isPending={addImage.isPending}
-            language={language}
-            c={c}
-            onAdd={(productId, url) => addImage.mutateAsync({ productId, url })}
-          />
-        </Panel>
-        <Panel title={c.createCategory} eyebrow={c.organization}>
-          <form
-            className="control-form"
-            onSubmit={categoryForm.handleSubmit((values) =>
-              createCategory.mutate(values),
+          </div>
+        </form>
+      </ActionSheet>
+      <ActionSheet
+        open={imageSheetOpen}
+        title={c.manageImages}
+        eyebrow={c.imageGallery}
+        closeLabel={c.cancelEdit}
+        onClose={() => {
+          if (!addImage.isPending) closeImageSheet();
+        }}
+      >
+        <ImageAttachForm
+          products={products}
+          isPending={addImage.isPending}
+          language={language}
+          c={c}
+          onCancel={closeImageSheet}
+          onAdd={(productId, url) => addImage.mutateAsync({ productId, url })}
+        />
+      </ActionSheet>
+      <ActionSheet
+        open={categorySheetOpen}
+        title={c.createCategory}
+        eyebrow={c.organization}
+        closeLabel={c.cancelEdit}
+        onClose={() => {
+          if (!createCategory.isPending) closeCategorySheet();
+        }}
+      >
+        <form
+          className="control-form action-sheet-form"
+          onSubmit={categoryForm.handleSubmit((values) =>
+            createCategory.mutate(values),
+          )}
+        >
+          <label htmlFor="category-name">
+            {c.categoryName}
+            <input
+              id="category-name"
+              {...categoryForm.register("name")}
+              placeholder={c.categoryName}
+            />
+            {categoryForm.formState.errors.name && (
+              <span className="field-error">
+                {readFormError(categoryForm.formState.errors.name.message, language)}
+              </span>
             )}
-          >
-            <label htmlFor="category-name">
-              {c.categoryName}
-              <input
-                id="category-name"
-                {...categoryForm.register("name")}
-                placeholder={c.categoryName}
-              />
-              {categoryForm.formState.errors.name && (
-                <span className="field-error">
-                  {readFormError(categoryForm.formState.errors.name.message, language)}
-                </span>
+          </label>
+          <label htmlFor="category-slug">
+            {c.slug}
+            <input
+              id="category-slug"
+              {...categoryForm.register("slug")}
+              placeholder={c.slug}
+            />
+            {categoryForm.formState.errors.slug && (
+              <span className="field-error">
+                {readFormError(categoryForm.formState.errors.slug.message, language)}
+              </span>
+            )}
+          </label>
+          <label htmlFor="category-icon">
+            {c.icon}
+            <input
+              id="category-icon"
+              {...categoryForm.register("icon")}
+              placeholder={c.icon}
+            />
+            {categoryForm.formState.errors.icon && (
+              <span className="field-error">
+                {readFormError(categoryForm.formState.errors.icon.message, language)}
+              </span>
+            )}
+          </label>
+          <label htmlFor="category-sortOrder">
+            {c.sortOrder}
+            <Controller
+              control={categoryForm.control}
+              name="sortOrder"
+              render={({ field }) => (
+                <NumberInput
+                  id="category-sortOrder"
+                  name={field.name}
+                  ref={field.ref}
+                  value={field.value}
+                  onBlur={field.onBlur}
+                  onValueChange={field.onChange}
+                  placeholder={c.sortOrder}
+                />
               )}
-            </label>
-            <label htmlFor="category-slug">
-              {c.slug}
-              <input
-                id="category-slug"
-                {...categoryForm.register("slug")}
-                placeholder={c.slug}
-              />
-              {categoryForm.formState.errors.slug && (
-                <span className="field-error">
-                  {readFormError(categoryForm.formState.errors.slug.message, language)}
-                </span>
-              )}
-            </label>
-            <label htmlFor="category-icon">
-              {c.icon}
-              <input
-                id="category-icon"
-                {...categoryForm.register("icon")}
-                placeholder={c.icon}
-              />
-              {categoryForm.formState.errors.icon && (
-                <span className="field-error">
-                  {readFormError(categoryForm.formState.errors.icon.message, language)}
-                </span>
-              )}
-            </label>
-            <label htmlFor="category-sortOrder">
-              {c.sortOrder}
-              <Controller
-                control={categoryForm.control}
-                name="sortOrder"
-                render={({ field }) => (
-                  <NumberInput
-                    id="category-sortOrder"
-                    name={field.name}
-                    ref={field.ref}
-                    value={field.value}
-                    onBlur={field.onBlur}
-                    onValueChange={field.onChange}
-                    placeholder={c.sortOrder}
-                  />
-                )}
-              />
-              {categoryForm.formState.errors.sortOrder && (
-                <span className="field-error">
-                  {readFormError(categoryForm.formState.errors.sortOrder.message, language)}
-                </span>
-              )}
-            </label>
+            />
+            {categoryForm.formState.errors.sortOrder && (
+              <span className="field-error">
+                {readFormError(categoryForm.formState.errors.sortOrder.message, language)}
+              </span>
+            )}
+          </label>
+          <div className="form-actions">
+            <button
+              className="ghost-button"
+              type="button"
+              disabled={createCategory.isPending}
+              onClick={closeCategorySheet}
+            >
+              {c.cancelEdit}
+            </button>
             <button
               className="primary-button"
               type="submit"
               disabled={createCategory.isPending}
             >
-              <Tags size={17} /> {c.createCategory}
+              <Tags size={17} /> {c.createCategoryDialog}
             </button>
-          </form>
-        </Panel>
-      </div>
+          </div>
+        </form>
+      </ActionSheet>
     </div>
   );
 }
@@ -1436,7 +1607,7 @@ function ProductMerchandisingCell({
         language,
         c,
       )}`
-    : c.startFlashWindow;
+    : c.flashSaleHelp;
   const flashActionLabel = product.isFlashSale
     ? flashExpired
       ? c.renew7d
@@ -1445,30 +1616,45 @@ function ProductMerchandisingCell({
 
   return (
     <div className="merch-cell">
-      <div className="merch-row">
+      <div className="merch-row" data-state={product.isFeatured ? "on" : "off"}>
         <span className="merch-state">
-          <strong>{c.featured}</strong>
-          <Badge tone={product.isFeatured ? "hot" : "neutral"}>
-            {product.isFeatured ? c.on : c.off}
-          </Badge>
+          <span className="merch-state-heading">
+            <span className="merch-dot" aria-hidden="true" />
+            <strong>{c.featured}</strong>
+            <Badge tone={product.isFeatured ? "hot" : "neutral"}>
+              {product.isFeatured ? c.on : c.off}
+            </Badge>
+          </span>
+          <span className="merch-state-detail">{c.featuredHelp}</span>
         </span>
         <button
           className="table-button merch-action-button"
           type="button"
+          aria-label={`${product.isFeatured ? c.hide : c.show} ${c.featured}`}
+          title={`${product.isFeatured ? c.hide : c.show} ${c.featured}`}
           disabled={disabled}
           onClick={() => onUpdate({ isFeatured: !product.isFeatured })}
         >
           {product.isFeatured ? c.hide : c.show}
         </button>
       </div>
-      <div className="merch-row">
+      <div
+        className="merch-row"
+        data-state={flashExpired ? "expired" : flashActive ? "live" : "off"}
+      >
         <span className="merch-state">
-          <strong>{c.flash}</strong>
-          <Badge tone={flashTone}>{flashStatus}</Badge>
+          <span className="merch-state-heading">
+            <span className="merch-dot" aria-hidden="true" />
+            <strong>{c.flash}</strong>
+            <Badge tone={flashTone}>{flashStatus}</Badge>
+          </span>
+          <span className="merch-state-detail">{flashDetail}</span>
         </span>
         <button
           className="table-button merch-action-button"
           type="button"
+          aria-label={`${flashActionLabel} ${c.flashSale}`}
+          title={`${flashActionLabel} ${c.flashSale}`}
           disabled={disabled}
           onClick={() =>
             product.isFlashSale && !flashExpired
@@ -1482,7 +1668,6 @@ function ProductMerchandisingCell({
           {flashActionLabel}
         </button>
       </div>
-      {product.isFlashSale && <span className="merch-note">{flashDetail}</span>}
     </div>
   );
 }
@@ -1599,12 +1784,14 @@ function ImageAttachForm({
   isPending,
   language,
   c,
+  onCancel,
   onAdd,
 }: {
   products: Product[];
   isPending: boolean;
   language: Language;
   c: CatalogCopy;
+  onCancel: () => void;
   onAdd: (productId: string, url: string) => Promise<ProductImage | undefined>;
 }) {
   const form = useForm<ImageFormInput, unknown, ImageForm>({
@@ -1614,7 +1801,7 @@ function ImageAttachForm({
   const imageUrl = useWatch({ control: form.control, name: "url" });
   return (
     <form
-      className="control-form minor-form"
+      className="control-form action-sheet-form"
       onSubmit={form.handleSubmit(
         async (values) => {
           try {
@@ -1628,7 +1815,7 @@ function ImageAttachForm({
       )}
     >
       <label htmlFor="image-productId">
-        {c.imageTarget}
+        {c.product}
         <Controller
           control={form.control}
           name="productId"
@@ -1636,8 +1823,11 @@ function ImageAttachForm({
             <SelectMenu
               id="image-productId"
               value={field.value ?? ""}
+              searchable
+              searchPlaceholder={c.search}
+              noResultsLabel={c.noOptions}
               options={[
-                { value: "", label: c.imageTarget },
+                { value: "", label: c.selectProduct },
                 ...products.map((product) => ({
                   value: product.id,
                   label: product.name,
@@ -1676,9 +1866,19 @@ function ImageAttachForm({
         )}
         <AssetPreview value={imageUrl} label={c.attachedImagePreview} c={c} />
       </label>
-      <button className="ghost-button" type="submit" disabled={isPending}>
-        <ImagePlus size={16} /> {c.attachImage}
-      </button>
+      <div className="form-actions">
+        <button
+          className="ghost-button"
+          type="button"
+          disabled={isPending}
+          onClick={onCancel}
+        >
+          {c.cancelEdit}
+        </button>
+        <button className="primary-button" type="submit" disabled={isPending}>
+          <ImagePlus size={16} /> {c.attachImage}
+        </button>
+      </div>
     </form>
   );
 }
